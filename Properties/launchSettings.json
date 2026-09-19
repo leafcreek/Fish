@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Fish (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Fish (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
