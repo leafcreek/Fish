@@ -1,9 +1,7 @@
 {
+  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "Fish (Package)": {
-      "commandName": "MsixPackage"
-    },
-    "Fish (Unpackaged)": {
+    "Fish": {
       "commandName": "Project"
     }
   }

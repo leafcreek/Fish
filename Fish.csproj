@@ -7,28 +7,17 @@
     <RootNamespace>Fish</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <Platforms>x64</Platforms>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-
-    <PublishTrimmed>false</PublishTrimmed>
-
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
 
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Unpackaged WinUI 3 -->
+    <!-- Fish ist grundsätzlich eine unpackaged App -->
     <WindowsPackageType>None</WindowsPackageType>
 
-    <!-- Windows App SDK + .NET mitliefern -->
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
-
-    <!-- Single-file EXE -->
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <PublishSingleFile>true</PublishSingleFile>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <!-- dotnet run / Debug soll die normale unpackaged App starten -->
+    <EnableWinAppRunSupport>false</EnableWinAppRunSupport>
 </PropertyGroup>
 
   <ItemGroup>
