@@ -1,4 +1,4 @@
-﻿param([switch]$SkipTray)
+param([switch]$SkipTray)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -21,8 +21,6 @@ try {
  $window = $app.MainWindowHandle
  $root = if ($window -ne 0) { [System.Windows.Automation.AutomationElement]::FromHandle($window) } else { $null }
  function Find-Element([string]$name) { return $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$name)) }
- $skipGuide = Find-Element 'Überspringen'
- if ($skipGuide) { $skipGuide.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); Start-Sleep -Milliseconds 500 }
  $deadline = [DateTime]::UtcNow.AddSeconds(20)
  do {
    $app.Refresh()
@@ -34,9 +32,9 @@ try {
  if (!$navigation) { throw 'Application page was not available within 20 seconds' }
  $navigation.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
  Start-Sleep -Milliseconds 300
- (Find-Element 'Sitzungsende').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+ (Find-Element 'Immer im Vordergrund').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
  Start-Sleep -Seconds 1
- if (!(Get-Content (Join-Path $settings 'appsettings.json') -Raw | ConvertFrom-Json).NotifySessionEnd) { throw 'Autosave failed' }
+ if ((Get-Content (Join-Path $settings 'appsettings.json') -Raw | ConvertFrom-Json).AlwaysOnTop) { throw 'Autosave failed' }
  Write-Output 'PASS Autosave before exit'
  if (!$SkipTray) {
  [FishApplicationSmoke]::ShowWindow($window,6) | Out-Null
@@ -51,19 +49,19 @@ try {
  if (![FishApplicationSmoke]::IsWindowVisible($window)) { throw 'Tray restore failed' }
  Write-Output 'PASS Tray activation restores window'
  } else { Write-Output 'SKIP Tray: environment without accessible Windows notification area' }
- (Find-Element 'Bericht speichern').GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
- Start-Sleep -Seconds 1
- if (!(Test-Path (Join-Path $settings 'diagnostics/Fish-*.txt'))) { throw 'Diagnostics export failed' }
- Write-Output 'PASS Diagnostics export'
  $updateButton = Find-Element 'Nach Updates suchen'
  $updateButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
  Start-Sleep -Milliseconds 300
- $skipGuide = Find-Element 'Überspringen'
- if ($skipGuide) { $skipGuide.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); Start-Sleep -Milliseconds 500 }
  $deadline = [DateTime]::UtcNow.AddSeconds(20)
- while (!$updateButton.Current.IsEnabled -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
+ $close = Find-Element 'Schließen'
+ if ($close) { $close.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+ while (!$updateButton.Current.IsEnabled -and [DateTime]::UtcNow -lt $deadline) {
+   $close = Find-Element 'Schließen'
+   if ($close) { $close.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+   Start-Sleep -Milliseconds 250
+ }
  if (!$updateButton.Current.IsEnabled) { throw 'Update check did not finish' }
- $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name } | Where-Object { $_ -match 'Globaler Stop aktiv|Veröffentlichung|Updateprüfung fehlgeschlagen|Neue Version' } | Select-Object -Unique
+ $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name } | Where-Object { $_ -match 'Veröffentlichung|Updateprüfung fehlgeschlagen|Neue Version' } | Select-Object -Unique
  Write-Output "Test settings: $settings"
 } finally {
  $app.Refresh()

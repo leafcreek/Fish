@@ -13,6 +13,8 @@
 
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Never bundle previous builds, screenshots, diagnostics or publish output. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish\**</DefaultItemExcludes>
 
     <!-- Fish ist grundsätzlich eine unpackaged App -->
     <WindowsPackageType>None</WindowsPackageType>
@@ -26,6 +28,12 @@
     <Compile Remove="Tests\**\*.cs" />
     <None Remove="Tests\**" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="artifacts\**\*" />
+    <None Remove="artifacts\**\*" />
+    <EmbeddedResource Remove="artifacts\**\*" />
+</ItemGroup>
 
   <!--
     Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging

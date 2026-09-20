@@ -1,4 +1,4 @@
-﻿using Fish.Configuration;
+using Fish.Configuration;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -38,14 +38,13 @@ internal static class SettingsEditor
         Toggle(shutdown, "120 Sekunden ohne Loot", o.FeaturesShutdownOnInactivity, v => { o.FeaturesShutdownOnInactivity = v; changed(); });
         Toggle(shutdown, "Inventar voll", o.FeaturesShutdownOnFullBag, v => { o.FeaturesShutdownOnFullBag = v; changed(); });
         Toggle(shutdown, "Charakter tot", o.FeaturesShutdownOnDeath, v => { o.FeaturesShutdownOnDeath = v; changed(); });
-        features.Children.Add(new TextBlock { Text = "Folgeaktionen gelten während einer gestarteten Sitzung. Stop bricht auch laufende Countdowns ab.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new(4, 4, 4, 0) });
     }
 
     private static StackPanel Group(StackPanel parent, string title, string subtitle, bool expanded)
     {
         var header = new StackPanel { Spacing = 3 };
-        header.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        header.Children.Add(new TextBlock { Text = subtitle, FontSize = 11, TextWrapping = TextWrapping.Wrap });
+        header.Children.Add(new TextBlock { Text = title, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        header.Children.Add(new TextBlock { Text = subtitle, FontSize = 12, TextWrapping = TextWrapping.Wrap });
         var content = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch };
         parent.Children.Add(new Expander
         {
@@ -61,8 +60,8 @@ internal static class SettingsEditor
         row.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Orientation = Orientation.Horizontal, Spacing = 8 };
-        text.Children.Add(new TextBlock { Text = label, FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
-        if (unit != null) text.Children.Add(new TextBlock { Text = unit, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        text.Children.Add(new TextBlock { Text = label, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+        if (unit != null) text.Children.Add(new TextBlock { Text = unit, FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
         row.Children.Add(text);
         panel.Children.Add(row);
         return row;
@@ -72,7 +71,6 @@ internal static class SettingsEditor
     {
         var row = Row(panel, label, unit);
         var control = new NumberBox { Value = value, Minimum = min, Maximum = max, Width = 116, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(control, $"{label} ({unit})");
         control.ValueChanged += (_, args) => { if (double.IsFinite(args.NewValue)) write((int)Math.Clamp(Math.Round(args.NewValue), min, max)); };
         Grid.SetColumn(control, 1);
         row.Children.Add(control);
@@ -82,7 +80,6 @@ internal static class SettingsEditor
     {
         var row = Row(panel, label);
         var control = new ToggleSwitch { IsOn = value, OnContent = "", OffContent = "", MinWidth = 0, VerticalAlignment = VerticalAlignment.Center };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(control, label);
         control.Toggled += (_, _) => write(control.IsOn);
         Grid.SetColumn(control, 1);
         row.Children.Add(control);

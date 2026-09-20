@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -11,7 +11,6 @@
     <Compile Include="../Configuration/*.cs" Link="Configuration/%(Filename)%(Extension)" />
     <Compile Include="../Native/*.cs" Link="Native/%(Filename)%(Extension)" />
     <Compile Include="../Services/UpdateService.cs" Link="Services/UpdateService.cs" />
-    <Compile Include="../Services/DiagnosticsService.cs" Link="Services/DiagnosticsService.cs" />
     <Compile Include="../Services/BotDesktop.cs" Link="Services/BotDesktop.cs" />
   </ItemGroup>
 </Project>

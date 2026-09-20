@@ -1,4 +1,4 @@
-﻿using Fish.Configuration;
+using Fish.Configuration;
 using System.Diagnostics;
 using Fish.Core;
 using Fish.Native;
@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _overlayTimer;
     private readonly BotDesktop _overlayDesktop = new();
     private SessionMetrics _metrics = new();
+    private PreviewBuffer _previews = new();
     private readonly Process _process = Process.GetCurrentProcess();
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _performanceTimer;
     private TimeSpan? _lastCpu;
@@ -50,7 +51,13 @@ public sealed partial class MainWindow : Window
         _topmostTimer.Start();
         _overlayTimer = DispatcherQueue.CreateTimer();
         _overlayTimer.Interval = TimeSpan.FromMilliseconds(150);
-        _overlayTimer.Tick += (_, _) => UpdateOverlays();
+        _overlayTimer.Tick += (_, _) =>
+        {
+            UpdateOverlays();
+            if (PreviewSection.IsExpanded && OverviewPage.Visibility == Visibility.Visible && AppWindow.IsVisible &&
+                AppWindow.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+                PreviewPanel.Refresh(_previews);
+        };
         _overlayTimer.Start();
         _performanceTimer = DispatcherQueue.CreateTimer();
         _performanceTimer.Interval = TimeSpan.FromSeconds(1);
@@ -108,12 +115,15 @@ public sealed partial class MainWindow : Window
     }
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (_session is { IsCompleted: false } || _closing || _introductionOpen) return;
+        if (_session is { IsCompleted: false } || _closing) return;
         _options.Normalize();
         MessageBar.IsOpen = false;
         _metrics = new();
         PerformancePanel.Reset();
+        _previews = new();
+        PreviewPanel.Reset();
         _cancellation = new();
+        AnimateAction(true);
         SetRunning(true);
         int id = ++_sessionId;
         _session = RunSessionAsync(id, _cancellation);
@@ -127,10 +137,11 @@ public sealed partial class MainWindow : Window
         int bobberTolerance = _options.BobberAreaTolerance, splashTolerance = _options.SplashAreaTolerance;
         var metrics = _metrics;
         engine.ScanMeasured += metrics.RecordScan;
+        engine.PreviewAvailable += _previews.Add;
         engine.Logged += entry =>
         {
             metrics.Record(entry);
-            DispatcherQueue.TryEnqueue(() => { if (!_closeAllowed) { _viewModel.AddLog(entry); NotifyEntry(entry); } });
+            DispatcherQueue.TryEnqueue(() => { if (!_closeAllowed) { _viewModel.AddLog(entry); } });
         };
         engine.Updated += update =>
         {
@@ -166,6 +177,8 @@ public sealed partial class MainWindow : Window
             _options.SplashAreaTolerance = splashTolerance;
             _sessionId++;
 
+            PreviewPanel.Refresh(_previews);
+            PreviewPanel.PauseLive();
             _displayed = null;
             _viewModel.Status = "Bereit";
             _viewModel.Activity = "Gestoppt · keine ausstehenden Aktionen";
@@ -180,7 +193,6 @@ public sealed partial class MainWindow : Window
     }
     private void RefreshPerformance()
     {
-        if (_viewModel.FilterMinutes > 0) _viewModel.RefreshLogFilter();
         double? cpu = null, memory = null;
         try
         {
@@ -204,27 +216,14 @@ public sealed partial class MainWindow : Window
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
         if (_cancellation is not { IsCancellationRequested: false }) return;
+        AnimateAction(false);
         _viewModel.AddLog("Stop angefordert. Laufende Sitzung und Countdowns werden abgebrochen.");
         _cancellation.Cancel();
     }
 
-    private void ClearLog_Click(object sender, RoutedEventArgs e) => _viewModel.Log.Clear();
-
-    private void CopyLog_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            data.SetText(string.Join(Environment.NewLine, _viewModel.FilteredLog.Reverse()));
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
-        }
-        catch (Exception ex) { ShowError("Protokoll konnte nicht kopiert werden: " + ex.Message); }
-    }
     private void ApplyUpdate(BotUpdate update)
     {
-        bool statusChanged = _viewModel.Status != BotEngine.StateText(update.State);
         _viewModel.Status = BotEngine.StateText(update.State);
-        if (statusChanged) Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer.FromElement(StatusText)?.RaiseAutomationEvent(Microsoft.UI.Xaml.Automation.Peers.AutomationEvents.LiveRegionChanged);
         _viewModel.Activity = update.Activity;
         _viewModel.Tolerances = $"Toleranz · Bobber {update.BobberTolerance} · Splash {update.SplashTolerance}";
         if (_options.BobberAreaTolerance != update.BobberTolerance || _options.SplashAreaTolerance != update.SplashTolerance)
@@ -234,6 +233,7 @@ public sealed partial class MainWindow : Window
         }
         _tray?.SetStatus(_viewModel.Status);
         _displayed = update;
+        if (update.State != BotState.Fishing) PreviewPanel.PauseLive();
         UpdateOverlays();
     }
     private void UpdateOverlays()
@@ -291,6 +291,8 @@ public sealed partial class MainWindow : Window
         _topmostTimer.Stop();
         _overlayTimer.Stop();
         _performanceTimer.Stop();
+        _lampPulse?.Stop();
+        _actionFeedback?.Stop();
         _process.Dispose();
         _applicationLifetime.Cancel();
         _tray?.Dispose();
@@ -314,11 +316,8 @@ public sealed partial class MainWindow : Window
     }
     private void ShowError(string message)
     {
-        _lastError = message;
         MessageBar.Severity = InfoBarSeverity.Error; MessageBar.Message = message; MessageBar.IsOpen = true;
         var entry = new BotLogEntry(DateTimeOffset.Now, LogLevel.Error, "Fish", "app.error", message);
-        _viewModel.AddLog(entry); NotifyEntry(entry);
-        try { DiagnosticsService.Write(DiagnosticsFolder, DiagnosticsService.Report(_viewModel.Log.ToArray(), _metrics.Snapshot(DateTimeOffset.UtcNow), message)); }
-        catch { /* The visible error remains available when the report cannot be written. */ }
+        _viewModel.AddLog(entry);
     }
 }

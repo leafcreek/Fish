@@ -13,6 +13,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
     public event Action<BotUpdate>? Updated;
     public event Action<BotLogEntry>? Logged;
     public event Action<DateTimeOffset, double>? ScanMeasured;
+    public event Action<PixelFrame, bool, bool>? PreviewAvailable;
 
     public async Task RunAsync(BotOptions source, CancellationToken cancellation)
     {
@@ -32,6 +33,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
         DateTimeOffset? castTime = null, lastSplash = null, closeAt = null, shutdownAt = null;
         nint game = 0, countdownGame = 0;
         bool looted = false, bobberIncreased = false, splashIncreased = false, splashDecreased = false, timedOut = false;
+        bool splashDetected = false;
         int increases = 0, decreases = 0;
         BotState state = BotState.None;
         PixelRect? splashArea = null;
@@ -102,6 +104,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                     castTime = lastSplash = null;
                     splashArea = gameBounds = null;
                     looted = bobberIncreased = splashIncreased = splashDecreased = timedOut = false;
+                    splashDetected = false;
                     increases = decreases = 0;
                     nextAction = now;
                     state = BotState.None;
@@ -132,6 +135,8 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                 }
                 if (next != state)
                 {
+                    if (next == BotState.Idle && state == BotState.Fishing && splashDetected && !timedOut && !looted)
+                        Log("cast.no-fish", "Angeln", "Kein Fisch angebissen · Wurf nach erkanntem Splash ohne Loot-Bestätigung beendet.", LogLevel.Warning);
                     state = next;
                     Log("state.changed", "Status", state switch
                     {
@@ -186,6 +191,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                         castTime = now;
                         splashArea = null;
                         looted = splashDecreased = bobberIncreased = timedOut = false;
+                        splashDetected = false;
                         increases = decreases = 0;
                         nextAction = now.AddSeconds(2);
                         casts++; Log("cast.requested", "Angeln", $"Wurf {casts} angefordert · Taste 1 gesendet · 2 s Wartezeit.");
@@ -216,9 +222,11 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                             var hit = Detection.Find(frame, options.PerformanceSkip,
                                 splash ? options.SplashAreaTolerance : options.BobberAreaTolerance, splash);
                             ScanMeasured?.Invoke(_time.GetUtcNow(), Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds);
+                            PreviewAvailable?.Invoke(frame, splash, hit != null);
 
                             if (hit is { } point)
                             {
+                                if (splash) splashDetected = true;
                                 if (!splash)
                                 {
                                     splashArea = Detection.Around(new(bounds.X + point.X, bounds.Y + point.Y), options.SplashAreaWidth,

@@ -1,10 +1,20 @@
-﻿using Fish.Configuration;
+using Fish.Configuration;
 using Fish.Core;
 using Fish.Native;
 using Fish.Services;
 
 int passed = 0;
 void Check(bool value, string message) { if (!value) throw new Exception(message); passed++; Console.WriteLine("PASS " + message); }
+var previewBuffer = new PreviewBuffer();
+var previewPixels = new int[800 * 400];
+previewPixels[0] = 0xff0000;
+previewBuffer.Add(new(800, 400, previewPixels), false, true);
+previewPixels[0] = 0;
+var preview = previewBuffer.Take();
+Check(preview.Bobber is { Width: 480, Height: 240 } && preview.Bobber.Pixels[0] == unchecked((int)0xffff0000), "Vorschau bewahrt Seitenverhältnis, kopiert Pixel und setzt Alpha");
+previewBuffer.Add(new(2, 1, [0xffffff, 0]), true, true);
+Check(previewBuffer.Take().Splash?.Pixels[0] == unchecked((int)0xffffffff), "Splash-Fund bleibt unabhängig vom Live-Limit erhalten");
+Check(previewBuffer.Take() == (null, null, null), "Vorschaupuffer gibt konsumierte Bilder frei");
 var colors = new (int Pixel, BotState State)[] { (0xff0000, BotState.Idle), (0x0000ff, BotState.Fishing), (0x00ff00, BotState.Looting),
     (0xffffff, BotState.Idle), (0x000000, BotState.WANotFound), (0xffff00, BotState.WANotFound),
     (0xff00ff, BotState.WANotFound), (0x00ffff, BotState.FullBag), (0xffa500, BotState.Dead), (0x123456, BotState.WANotFound) };
@@ -241,49 +251,56 @@ Check(metrics.Snapshot(metricsStart.AddSeconds(91)) is { Casts: 0, Loots: 0, Tim
 MetricEvent("loot.confirmed", 92);
 Check(metrics.Snapshot(metricsStart.AddSeconds(93)) is { Loots: 1, SuccessfulCasts: 0, AverageCatchSeconds: null },
     "Übernommener Wurf verfälscht weder Erfolgsquote noch eigene Wurfdauer");
+foreach (string outcome in new[] { "empty", "loot", "timeout", "cancel" })
+{
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, OnCapture = () => clock.Advance(1), FindBobber = true, FindSplash = true };
+    var engine = new BotEngine(fake, clock);
+    var counts = new SessionMetrics();
+    engine.Logged += entry =>
+    {
+        counts.Record(entry);
+        if (entry.EventId == "loot.confirmed") fake.StatePixel = 0xff0000;
+    };
+    fake.OnLoot = () =>
+    {
+        if (outcome == "cancel") cts.Cancel();
+        else if (outcome == "timeout") clock.Advance(30);
+        else fake.StatePixel = outcome == "loot" ? 0x00ff00 : 0xff0000;
+    };
+    fake.OnKey = key => { if (key == 0x31) cts.Cancel(); else if (key == 0x1b) fake.StatePixel = 0xff0000; };
+    await RunUntilCanceled(engine, new() { PerformanceScanRate = 100 }, cts);
+    var result = counts.Snapshot(clock.GetUtcNow());
+    Check(fake.Loots == 1 && result.NoFish == (outcome == "empty" ? 1 : 0) && result.Timeouts == (outcome == "timeout" ? 1 : 0),
+        "Kein Fisch angebissen: abgeschlossenes Splash-Ergebnis " + outcome);
+    counts.Record(new(clock.GetUtcNow(), LogLevel.Info, "Sitzung", "session.started", ""));
+    Check(counts.Snapshot(clock.GetUtcNow()).NoFish == 0, "Neue Sitzung setzt Kein-Fisch-Zähler zurück: " + outcome);
+}
 var release = UpdateService.ParseRelease("""{"draft":false,"prerelease":false,"tag_name":"v1.2.3","html_url":"https://github.com/leafcreek/Fish/releases/tag/v1.2.3","body":"Test notes"}""");
-Check(release.Version == new Version(1, 2, 3, 0) && release.Notes == "Test notes", "Updateprüfung liest stabile Version und Release-Notizen");
+Check(release.Version == new Version(1, 2, 3, 0), "Updateprüfung liest stabile Version");
 bool invalidRelease = false;
 try { UpdateService.ParseRelease("""{"draft":false,"prerelease":false,"tag_name":"v1.2.3","html_url":"file:///bad","body":""}"""); }
 catch (InvalidDataException) { invalidRelease = true; }
 Check(invalidRelease, "Updateprüfung verweigert unsichere Download-Adressen");
-bool invalidRepository = false;
-try { UpdateService.ValidateRepository("https://example.com/path"); } catch (ArgumentException) { invalidRepository = true; }
-Check(invalidRepository && UpdateService.ValidateRepository(" leafcreek/Fish ") == "leafcreek/Fish", "Updatequelle akzeptiert nur Besitzer/Projekt");
-var preferences = new BotOptions { CloseToTray = true, GlobalStopHotkey = false, NotifyErrors = false, NotificationSound = true, UpdateRepository = "leafcreek/Fish" };
+var preferences = new BotOptions { CloseToTray = true };
 store.Save(preferences);
 var savedPreferences = store.Load();
-Check(savedPreferences.CloseToTray && !savedPreferences.GlobalStopHotkey && !savedPreferences.NotifyErrors && savedPreferences.NotificationSound,
+Check(savedPreferences.CloseToTray,
     "Anwendungseinstellungen überstehen erneutes Laden");
-string homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-Check(string.IsNullOrEmpty(homePath) || !DiagnosticsService.Redact(homePath + "\\test.txt").Contains(homePath, StringComparison.OrdinalIgnoreCase), "Diagnose maskiert den Benutzerprofilpfad");
-string diagnosticsFolder = Path.Combine(folder, "diagnostics");
-for (int i = 0; i < 23; i++) DiagnosticsService.Write(diagnosticsFolder, "Testdiagnose " + i);
-Check(Directory.GetFiles(diagnosticsFolder, "Fish-*.txt").Length == 20, "Diagnoseaufbewahrung ist auf 20 Berichte begrenzt");
-var filterNow = DateTimeOffset.UtcNow;
-var warningEntry = new BotLogEntry(filterNow.AddMinutes(-2), LogLevel.Warning, "Erkennung", "bobber.missing", "Bobber wurde nicht gefunden");
-Check(LogFilter.Matches(warningEntry, "BOBBER Erkennung", LogFilterLevel.Problems, 5, filterNow), "Logsuche kombiniert Wörter und ignoriert Großschreibung");
-Check(!LogFilter.Matches(warningEntry, "", LogFilterLevel.Error, 0, filterNow) && !LogFilter.Matches(warningEntry, "", LogFilterLevel.All, 1, filterNow), "Logfilter berücksichtigt Stufe und Zeitfenster");
-var filteredModel = new Fish.ViewModels.MainViewModel();
-filteredModel.AddLog(warningEntry);
-filteredModel.AddLog("Unwichtige Information");
-filteredModel.SetLogFilter("bobber", LogFilterLevel.Warning, 5);
-Check(filteredModel.FilteredLog.SequenceEqual([warningEntry]) && filteredModel.Log.Count == 2, "Logfilter erhält den vollständigen Verlauf");
-filteredModel.RefreshLogFilter(filterNow.AddMinutes(10));
-Check(filteredModel.FilteredLog.Count == 0 && filteredModel.LogSummary.Contains("Keine Treffer"), "Zeitfilter lässt alte Treffer automatisch verschwinden");
-filteredModel.Log.Clear();
-Check(filteredModel.FilteredLog.Count == 0 && filteredModel.LogSummary.Contains("Noch keine"), "Leeren entfernt auch die gefilterte Ansicht");
 var mainWork = new PixelRect(0, 0, 1920, 1040);
 var leftWork = new PixelRect(-1920, -100, 1920, 1040);
 Check(WindowPlacement.Fit(new(-1800, -50, 760, 740), [mainWork, leftWork], mainWork) == new PixelRect(-1800, -50, 760, 740), "Fensterposition auf Monitor mit negativen Koordinaten bleibt erhalten");
 var recovered = WindowPlacement.Fit(new(6000, 200, 760, 740), [mainWork], mainWork);
 Check(recovered == new PixelRect(580, 150, 760, 740), "Entfernter Monitor führt zu sichtbarem zentriertem Fenster");
 Check(WindowPlacement.Fit(new(0, 0, 3000, 2000), [mainWork], mainWork) == mainWork, "Übergroßes Fenster wird auf die Arbeitsfläche ohne Taskleiste begrenzt");
-store.Save(new BotOptions { Theme = "Light", ReduceMotion = true, AlwaysOnTop = false, WelcomeCompleted = true, WindowMaximized = true, WindowDpi = 144 });
+store.Save(new BotOptions { Theme = "Light", AlwaysOnTop = false, WindowMaximized = true, WindowDpi = 144 });
 var experience = store.Load();
-Check(experience.Theme == "Light" && experience.ReduceMotion && !experience.AlwaysOnTop && experience.WelcomeCompleted && experience.WindowMaximized && experience.WindowDpi == 144, "Darstellung, Einführung und Fensterzustand werden gespeichert");
+Check(experience.Theme == "Light" && !experience.AlwaysOnTop && experience.WindowMaximized && experience.WindowDpi == 144, "Darstellung und Fensterzustand werden gespeichert");
 var invalidTheme = new BotOptions { Theme = "invalid" }; invalidTheme.Normalize();
-Check(invalidTheme.Theme == "System", "Unbekanntes Farbschema fällt auf System zurück");
+Check(invalidTheme.Theme == "Dark", "Unbekanntes Farbschema fällt auf Dark zurück");
+var legacyTheme = new BotOptions { Theme = "System" }; legacyTheme.Normalize();
+Check(legacyTheme.Theme == "Dark" && new BotOptions().Theme == "Dark", "Dark ist Standard und ersetzt den bisherigen System-Modus");
 if (args.Contains("--desktop-smoke"))
 {
     var monitors = Desktop.Monitors();

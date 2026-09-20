@@ -1,23 +1,15 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Fish.Configuration;
 
 public sealed class BotOptions
 {
-    public string Theme { get; set; } = "System";
-    public bool ReduceMotion { get; set; }
+    public string Theme { get; set; } = "Dark";
     public bool AlwaysOnTop { get; set; } = true;
-    public bool WelcomeCompleted { get; set; }
     public bool WindowMaximized { get; set; }
     public int WindowDpi { get; set; }
     public bool MinimizeToTray { get; set; } = true;
     public bool CloseToTray { get; set; }
-    public bool GlobalStopHotkey { get; set; } = true;
-    public bool NotifyErrors { get; set; } = true;
-    public bool NotifyActions { get; set; } = true;
-    public bool NotifySessionEnd { get; set; }
-    public bool NotificationSound { get; set; }
-    public string UpdateRepository { get; set; } = "leafcreek/Fish";
     public int SchemaVersion { get; set; } = 1;
     public int WindowWidth { get; set; } = 760;
     public int WindowHeight { get; set; } = 740;
@@ -49,7 +41,7 @@ public sealed class BotOptions
 
     public void Normalize()
     {
-        if (Theme is not ("System" or "Dark" or "Light")) Theme = "System";
+        if (Theme is not ("Dark" or "Light")) Theme = "Dark";
         WindowDpi = WindowDpi == 0 ? 0 : Math.Clamp(WindowDpi, 96, 768);
         WindowWidth = Math.Clamp(WindowWidth, 720, 7680);
         WindowHeight = Math.Clamp(WindowHeight, 540, 4320);
