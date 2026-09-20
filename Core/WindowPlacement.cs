@@ -1,0 +1,18 @@
+﻿namespace Fish.Core;
+
+public static class WindowPlacement
+{
+    public static PixelRect Fit(PixelRect saved, IReadOnlyList<PixelRect> workAreas, PixelRect fallback)
+    {
+        var work = workAreas.OrderByDescending(area => Overlap(saved, area)).FirstOrDefault();
+        bool visible = work.Width > 0 && Overlap(saved, work) > 0;
+        if (!visible) work = fallback;
+        int width = Math.Clamp(saved.Width, Math.Min(720, work.Width), work.Width);
+        int height = Math.Clamp(saved.Height, Math.Min(540, work.Height), work.Height);
+        return new(visible ? Math.Clamp(saved.X, work.X, work.X + work.Width - width) : work.X + (work.Width - width) / 2,
+            visible ? Math.Clamp(saved.Y, work.Y, work.Y + work.Height - height) : work.Y + (work.Height - height) / 2, width, height);
+    }
+    private static long Overlap(PixelRect a, PixelRect b) =>
+        Math.Max(0, Math.Min((long)a.X + a.Width, (long)b.X + b.Width) - Math.Max(a.X, b.X)) *
+        Math.Max(0, Math.Min((long)a.Y + a.Height, (long)b.Y + b.Height) - Math.Max(a.Y, b.Y));
+}
