@@ -14,17 +14,13 @@ var preview = previewBuffer.Take();
 Check(preview.Bobber is { Width: 480, Height: 240 } && preview.Bobber.Pixels[0] == unchecked((int)0xffff0000), "Vorschau bewahrt Seitenverhältnis, kopiert Pixel und setzt Alpha");
 previewBuffer.Add(new(2, 1, [0xffffff, 0]), true, true);
 Check(previewBuffer.Take().Splash?.Pixels[0] == unchecked((int)0xffffffff), "Splash-Fund bleibt unabhängig vom Live-Limit erhalten");
-Check(previewBuffer.Take() == (null, null, null), "Vorschaupuffer gibt konsumierte Bilder frei");
+Check(previewBuffer.Take() == (null, null, null, null, null), "Vorschaupuffer gibt konsumierte Bilder frei");
 var colors = new (int Pixel, BotState State)[] { (0xff0000, BotState.Idle), (0x0000ff, BotState.Fishing), (0x00ff00, BotState.Looting),
     (0xffffff, BotState.Idle), (0x000000, BotState.WANotFound), (0xffff00, BotState.WANotFound),
     (0xff00ff, BotState.WANotFound), (0x00ffff, BotState.FullBag), (0xffa500, BotState.Dead), (0x123456, BotState.WANotFound) };
 foreach (var (color, state) in colors) Check(Detection.State(color | unchecked((int)0xff000000)) == state, "WeakAura " + state);
-Check(Detection.Find(new(2, 1, [0x111111, 0xff0000]), 0, 0, false) == new PixelPoint(1, 0), "Rote Feder");
-Check(Detection.Find(new(2, 1, [0x111111, 0xff0000]), 1, 0, false) == null, "Scan-Schrittweite");
-Check(Detection.Find(new(1, 1, [0x0000ff]), 0, 0, false) == null, "Blaue Feder wird ignoriert");
-Check(Detection.Find(new(1, 1, [0x826e50]), 0, 0, false) == null, "Brauner Körper wird ignoriert");
-Check(Detection.Find(new(1, 1, [0xe6e6e6]), 0, 20, true) != null, "Splash Toleranzgrenze inklusiv");
-Check(Detection.Find(new(1, 1, [0xe5e6e6]), 0, 20, true) == null, "Splash außerhalb Toleranz");
+SplashMotionTests.Run(Check);
+BobberMatchingTests.Run(Check, args);
 var monitor = new MonitorInfo("TEST", new(-1920, -200, 1920, 1080));
 Check(Detection.Around(new(-960, 340), 180, 120, 0, 20, monitor.Bounds) == new PixelRect(-1050, 260, 180, 120), "Negative Monitorkoordinaten und Y-Versatz");
 Check(Detection.Around(new(-1910, -190), 100, 100, 0, 0, monitor.Bounds) == new PixelRect(-1920, -200, 60, 60), "Suchbereich am Monitorrand beschneiden");
@@ -32,27 +28,33 @@ Check(Detection.Around(new(-1910, -190), 100, 100, 0, 0, monitor.Bounds) == new 
 string folder = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "tests", Guid.NewGuid().ToString("N"));
 var store = new SettingsStore(folder);
 var defaults = store.Load();
-Check(defaults.PerformanceSkip == 2, "Standard: zwei Pixel überspringen");
 Check(defaults.BobberAreaWidth == 800 && defaults.BobberAreaHeight == 400 && defaults.BobberAreaYOffset == 30, "Standard: Bobber-Geometrie");
-Check(defaults.BobberAreaTolerance == 200 && defaults.BobberAreaAutoLearn, "Standard: Bobber-Toleranz und Auto-Learn");
-Check(defaults.SplashAreaTolerance == 70 && defaults.SplashAreaAutoLearn, "Standard: Splash-Toleranz und Auto-Learn");
-store.Save(new BotOptions { BobberAreaTolerance = 400, PerformanceScanRate = 0 });
+Check(defaults.BobberMatchMinimum == 80, "Standard: Bobber-Mindestübereinstimmung 80 %");
+Check(defaults.SplashPixelTolerance == 20 && defaults.SplashChangePercent == 5 && defaults.SplashAdaptiveThreshold, "Standard: Splash-Bildvergleich mit adaptiver Grenze");
+store.Save(new BotOptions { BobberMatchMinimum = 400, PerformanceScanRate = 0 });
 var loaded = store.Load();
-Check(loaded.BobberAreaTolerance == 255 && loaded.PerformanceScanRate == 100, "Einstellungen normalisieren");
+Check(loaded.BobberMatchMinimum == 99 && loaded.PerformanceScanRate == 100, "Einstellungen normalisieren");
+store.Save(new BotOptions { BobberMatchMinimum = 10 });
+Check(store.Load().BobberMatchMinimum == 10, "Mindestübereinstimmung 10 % bleibt beim Speichern und Laden erhalten");
+var belowMinimum = new BotOptions { BobberMatchMinimum = 0 }; belowMinimum.Normalize();
+Check(belowMinimum.BobberMatchMinimum == 10, "Untere Grenze der Mindestübereinstimmung ist 10 %");
+File.WriteAllText(Path.Combine(folder, "appsettings.json"), """{"BobberAreaTolerance":255,"BobberAreaAutoLearn":true,"SplashAreaTolerance":65}""");
+Check(store.Load().BobberMatchMinimum == 80 && store.Load().SplashChangePercent == 5,
+    "Alte Farbtoleranzen werden ignoriert; der Splash-Bildvergleich erhält neue Defaults");
 store.Save(new BotOptions { FeaturesCastTime = 12, BobberAreaWidth = 600 });
 Check(File.Exists(Path.Combine(folder, "appsettings.json.bak")) && store.Load().FeaturesCastTime == 12, "Atomisches Speichern mit Backup");
 Check(store.Load().BobberAreaWidth == 600, "Gespeicherte Benutzerwerte bleiben erhalten");
 File.WriteAllText(Path.Combine(folder, "appsettings.json"), "{\"PerformanceScanRate\":150,}");
-Check(store.Load().BobberAreaWidth == 800 && store.Load().SplashAreaTolerance == 70, "Fehlende Felder erhalten neue Defaults");
+Check(store.Load().BobberAreaWidth == 800 && store.Load().SplashPixelTolerance == 20, "Fehlende Felder erhalten neue Defaults");
 Check(new SettingsStore().Folder == Path.GetFullPath(SettingsStore.DefaultFolder), "Standard-Speicherort ist das Anwendungsverzeichnis");
 var changed = new BotOptions { 
     WindowWidth = 1100, WindowHeight = 800, WindowXPosition = 120, WindowYPosition = 90,
-    PerformanceSkip = 4, BobberAreaTolerance = 180, SplashAreaTolerance = 65, FeaturesExitOnDeath = true };
+    BobberMatchMinimum = 88, SplashPixelTolerance = 24, SplashChangePercent = 7, FeaturesExitOnDeath = true };
 store.Save(changed);
 var restarted = new SettingsStore(folder).Load();
 Check(
     restarted.WindowWidth == 1100 && restarted.WindowHeight == 800 && restarted.WindowXPosition == 120 && restarted.WindowYPosition == 90 &&
-    restarted.PerformanceSkip == 4 && restarted.BobberAreaTolerance == 180 && restarted.SplashAreaTolerance == 65 && restarted.FeaturesExitOnDeath,
+    restarted.BobberMatchMinimum == 88 && restarted.SplashPixelTolerance == 24 && restarted.SplashChangePercent == 7 && restarted.FeaturesExitOnDeath,
     "Neustart lädt Fenster, Steuerung, Erkennung und Aktionen");
 async Task RunUntilCanceled(BotEngine engine, BotOptions config, CancellationTokenSource cts)
 {
@@ -73,7 +75,7 @@ using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
     var fake = new FakeDesktop { StatePixel = 0x0000ff, OnCapture = () => clock.Advance(1) };
     var engine = new BotEngine(fake, clock);
     fake.OnKey = key => { if (key == 0x1b) cts.Cancel(); };
-    await RunUntilCanceled(engine, new() { FeaturesCastTime = 5, PerformanceScanRate = 100, BobberAreaAutoLearn = false, SplashAreaAutoLearn = false }, cts);
+    await RunUntilCanceled(engine, new() { FeaturesCastTime = 5, PerformanceScanRate = 100 }, cts);
     Check(fake.Keys.SequenceEqual([0x1b]), "Cast-Timeout auch ohne Bobber und ohne Auto-Learn");
 }
 using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
@@ -99,7 +101,59 @@ using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
     fake.OnLoot = () => cts.Cancel();
     var engine = new BotEngine(fake, clock);
     await RunUntilCanceled(engine, new() { PerformanceScanRate = 100 }, cts);
-    Check(fake.Loots == 1 && fake.LastLoot is { X: < 0 }, "Bobber zu Splash zu Loot mit negativen Koordinaten");
+    var searchArea = fake.CapturedAreas.First(area => area.Width == 800);
+    Check(fake.Loots == 1 && fake.LastLoot == new PixelPoint(searchArea.X + 23 + BobberTemplate.Default.Anchor.X,
+        searchArea.Y + 31 + BobberTemplate.Default.Anchor.Y), "Bewegungssignal klickt auf den Bobber statt auf veränderte Wasserpixel");
+}
+using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6)))
+{
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, FindBobber = true, FindSplash = true,
+        RepeatSplash = true, OnCapture = () => clock.Advance(.25) };
+    fake.OnSplashCapture = count => { if (count >= 10) cts.Cancel(); };
+    await RunUntilCanceled(new(fake, clock), new() { PerformanceScanRate = 100 }, cts);
+    Check(fake.Loots == 1, "Wiederholte Bewegung und Splash-Rückkehr erzeugen im selben Wurf nur eine Loot-Anfrage");
+}
+using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6)))
+{
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, FindBobber = true, OnCapture = () => clock.Advance(.25) };
+    fake.SplashFrame = (_, frame) => { Array.Fill(frame.Pixels, 0xffffff); return frame; };
+    fake.OnSplashCapture = count => { if (count >= 8) cts.Cancel(); };
+    await RunUntilCanceled(new(fake, clock), new() { PerformanceScanRate = 100 }, cts);
+    Check(fake.Loots == 0, "Statisches Weiß im Splash-Bereich löst ohne Bewegung keine Spieleingabe aus");
+}
+using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6)))
+{
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, FindBobber = true, FindSplash = true, OnCapture = () => clock.Advance(.25) };
+    fake.OnSplashCapture = count => { if (count == 5) cts.Cancel(); };
+    await RunUntilCanceled(new(fake, clock), new() { PerformanceScanRate = 100 }, cts);
+    Check(fake.Loots == 0, "Stop während der Splash-Aufnahme verhindert die Loot-Anfrage");
+}
+using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7)))
+{
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, FindBobber = true, FindSplash = true,
+        RepeatSplash = true, OnCapture = () => clock.Advance(.25) };
+    int bobberHits = 0, secondSequence = 0;
+    var engine = new BotEngine(fake, clock);
+    engine.Logged += entry => { if (entry.EventId == "bobber.found") bobberHits++; };
+    fake.OnLoot = () => fake.Bounds = fake.Bounds with { X = fake.Bounds.X + 20 };
+    fake.OnSplashCapture = count => { if (bobberHits >= 2 && count >= 8) { secondSequence++; cts.Cancel(); } };
+    await RunUntilCanceled(engine, new() { PerformanceScanRate = 100 }, cts);
+    Check(fake.Loots == 1 && bobberHits == 2 && secondSequence == 1,
+        "Fensterbewegung setzt Referenz zurück und erhält die Loot-Sperre des laufenden Wurfs");
+}
+using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8)))
+{
+    var clock = new TestClock();
+    var fake = new FakeDesktop { StatePixel = 0x0000ff, FindBobber = true, FindSplash = true, OnCapture = () => clock.Advance(.25) };
+    fake.OnLoot = () => { if (fake.Loots == 1) fake.StatePixel = 0xff0000; else cts.Cancel(); };
+    fake.OnKey = key => { if (key == 0x31) fake.StatePixel = 0x0000ff; };
+    await RunUntilCanceled(new(fake, clock), new() { PerformanceScanRate = 100 }, cts);
+    Check(fake.Loots == 2 && fake.Keys.Count(key => key == 0x31) == 1,
+        "Neuer Wurf erhält eine frische Bewegungsreferenz und darf erneut Loot anfordern");
 }
 using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
 {
@@ -174,12 +228,12 @@ using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4)))
     var fake = new FakeDesktop { StatePixel = 0x0000ff, OnCapture = () => clock.Advance(1) };
     fake.OnKey = key =>
     {
-        if (key == 0x1b) { fake.Game = 2; fake.FindBobber = fake.FindSplash = true; }
+        if (key == 0x1b) { fake.Game = 2; fake.FindBobber = fake.FindSplash = true; fake.OnCapture = () => clock.Advance(.25); }
     };
     fake.OnLoot = () => cts.Cancel();
     await RunUntilCanceled(new BotEngine(fake, clock), new()
     {
-        FeaturesCastTime = 5, PerformanceScanRate = 100, BobberAreaAutoLearn = false, SplashAreaAutoLearn = false
+        FeaturesCastTime = 5, PerformanceScanRate = 100
     }, cts);
     Check(fake.Keys.SequenceEqual([0x1b]) && fake.Loots == 1,
         "Neues WoW-Fenster verwirft alten Timeout und erkennt wieder Bobber und Splash");
@@ -330,7 +384,7 @@ sealed class TestClock : TimeProvider
 {
     private DateTimeOffset _now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
     public override DateTimeOffset GetUtcNow() => _now;
-    public void Advance(int seconds) => _now = _now.AddSeconds(seconds);
+    public void Advance(double seconds) => _now = _now.AddSeconds(seconds);
 }
 sealed class TestWindow : IDisposable
 {
@@ -343,6 +397,8 @@ sealed class TestWindow : IDisposable
 }
 sealed class FakeDesktop : IBotDesktop
 {
+    private PixelRect? _lastSplashArea;
+    private int _splashCaptures;
     public PixelRect Bounds = new(-1920, -200, 1920, 1080);
     public List<PixelRect> CapturedAreas = [];
     public int StatePixel = 0xff0000;
@@ -353,6 +409,9 @@ sealed class FakeDesktop : IBotDesktop
     public PixelRect? LastExpectedBounds;
     public Action<int>? OnKey;
     public Action? OnCapture, OnLoot;
+    public Action<int>? OnSplashCapture;
+    public Func<int, PixelFrame, PixelFrame>? SplashFrame;
+    public bool RepeatSplash;
     public nint Game = 1;
     public nint FindGame() => Game;
     public bool IsAvailable(nint game) => WindowAvailable;
@@ -362,8 +421,25 @@ sealed class FakeDesktop : IBotDesktop
         Captures++; CapturedAreas.Add(bounds); OnCapture?.Invoke();
         if (bounds.Width == 1) return new(1, 1, [StatePixel]);
         var pixels = new int[bounds.Width * bounds.Height];
-        if (bounds.Width == 800 && FindBobber) pixels[0] = 0xff0000;
-        else if (FindSplash) pixels[0] = 0xfafafa;
+        if (bounds.Width == 800)
+        {
+            _lastSplashArea = null; _splashCaptures = 0;
+            if (FindBobber)
+            {
+                var frame = new PixelFrame(bounds.Width, bounds.Height, pixels);
+                BobberMatchingTests.Paste(frame, BobberTemplate.Default.Image, 23, 31);
+            }
+        }
+        else
+        {
+            if (_lastSplashArea != bounds) { _lastSplashArea = bounds; _splashCaptures = 0; }
+            _splashCaptures++;
+            OnSplashCapture?.Invoke(_splashCaptures);
+            if (SplashFrame != null) return SplashFrame(_splashCaptures, new(bounds.Width, bounds.Height, pixels));
+            if (FindSplash && _splashCaptures >= 5 && (!RepeatSplash || _splashCaptures % 2 == 1))
+                for (int y = 10; y < Math.Min(40, bounds.Height); y++)
+                for (int x = 10; x < Math.Min(50, bounds.Width); x++) pixels[y * bounds.Width + x] = 0x405060;
+        }
         return new(bounds.Width, bounds.Height, pixels);
     }
     public void Key(nint game, int key, CancellationToken cancellation) { cancellation.ThrowIfCancellationRequested(); Keys.Add(key); OnKey?.Invoke(key); }

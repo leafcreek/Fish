@@ -4,49 +4,59 @@ using System.Diagnostics;
 namespace Fish.Core;
 
 public sealed record BotUpdate(BotState State, string Activity, PixelRect? BobberArea, PixelRect? SplashArea,
-    int BobberTolerance, int SplashTolerance);
+    int BobberMatchMinimum, int SplashChangePercent);
 
 /// <summary>One serial session. The owner cancels and awaits it before starting another.</summary>
 public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly BobberTemplateMatcher _bobberMatcher = new(BobberTemplate.Default);
     public event Action<BotUpdate>? Updated;
     public event Action<BotLogEntry>? Logged;
     public event Action<DateTimeOffset, double>? ScanMeasured;
-    public event Action<PixelFrame, bool, bool>? PreviewAvailable;
+    public event Action<PixelFrame, bool, bool, SplashMeasurement?>? PreviewAvailable;
 
     public async Task RunAsync(BotOptions source, CancellationToken cancellation)
     {
         var options = source.Copy();
         options.Normalize();
+        var motion = new SplashMotionDetector(options.SplashPixelTolerance, options.SplashChangePercent,
+            options.SplashAdaptiveThreshold, options.SplashCalibrationMilliseconds);
+        SplashMeasurement? motionStatus = null;
         var now = _time.GetUtcNow();
         var startedAt = now;
         int casts = 0, lootRequests = 0, lootSignals = 0, timeouts = 0;
         string endReason = "Sitzung abgeschlossen";
-        DateTimeOffset? lastGeometryLog = null;
+        DateTimeOffset? lastGeometryLog = null, lastMotionResetLog = null;
         void Log(string id, string category, string message, LogLevel level = LogLevel.Info)
             => Logged?.Invoke(new(_time.GetUtcNow(), level, category, id, message));
-        string Learning() => $"Toleranz: Bobber {options.BobberAreaTolerance}, Splash {options.SplashAreaTolerance}";
+        string DetectionSettings() => $"Bobber-Mindestübereinstimmung {options.BobberMatchMinimum} %, Splash ab {options.SplashChangePercent} %, Pixel-Rauschtoleranz {options.SplashPixelTolerance}";
         var nextAction = now;
         var lastActivity = now;
 
-        DateTimeOffset? castTime = null, lastSplash = null, closeAt = null, shutdownAt = null;
+        DateTimeOffset? castTime = null, closeAt = null, shutdownAt = null;
         nint game = 0, countdownGame = 0;
-        bool looted = false, bobberIncreased = false, splashIncreased = false, splashDecreased = false, timedOut = false;
+        bool looted = false, timedOut = false, lootRequested = false;
         bool splashDetected = false;
-        int increases = 0, decreases = 0;
         BotState state = BotState.None;
         PixelRect? splashArea = null;
+        PixelPoint? bobberPoint = null;
         string countdownReason = "";
         PixelRect? gameBounds = null;
         PixelRect bobberArea = default;
 
+        string FishingActivity() => lootRequested ? "Warte auf Loot-Bestätigung" : splashArea == null ? "Bobber suchen" :
+            motionStatus?.Ready == true ? "Bewegung vergleichen" : "Splash kalibrieren";
+        void ResetObservation()
+        {
+            splashArea = null; bobberPoint = null; motionStatus = null; motion.Reset();
+        }
         BotUpdate? previousUpdate = null;
         void Publish(string activity)
         {
             var update = new BotUpdate(state, activity,
                 gameBounds != null ? bobberArea : null, gameBounds != null && state == BotState.Fishing ? splashArea : null,
-                options.BobberAreaTolerance, options.SplashAreaTolerance);
+                options.BobberMatchMinimum, options.SplashChangePercent);
             if (update == previousUpdate) return;
             previousUpdate = update;
             Updated?.Invoke(update);
@@ -57,7 +67,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
             countdownGame = game;
             closeAt = close ? now.AddSeconds(60) : null;
             shutdownAt = shutdown ? now.AddSeconds(120) : null;
-            splashArea = null;
+            ResetObservation();
             Log("action.scheduled", "Countdown", $"{reason}. " + (close ? "WoW schließen in 60 s. " : "") + (shutdown ? "Windows herunterfahren in 120 s. " : "") + "Stop bricht beide Aktionen ab.", LogLevel.Warning);
         }
         string Triggers(bool inactive, bool full, bool dead)
@@ -69,8 +79,8 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
             return triggers.Count == 0 ? "aus" : string.Join(", ", triggers);
         }
         bool CanAct() => !cancellation.IsCancellationRequested && desktop.FindGame() == game && desktop.IsAvailable(game) && gameBounds != null && desktop.GetGameBounds(game) == gameBounds;
-        Log("session.started", "Sitzung", $"Angeln gestartet · Taste 1 · Scan alle {options.PerformanceScanRate} ms · Pixelschritt {options.PerformanceSkip + 1} · Wurfdauer maximal {options.FeaturesCastTime} s.");
-        Log("session.detection", "Erkennung", $"{Learning()} · Auto-Learn Bobber {(options.BobberAreaAutoLearn ? "ein" : "aus")}, Splash {(options.SplashAreaAutoLearn ? "ein" : "aus")}.");
+        Log("session.started", "Sitzung", $"Angeln gestartet · Taste 1 · Scan alle {options.PerformanceScanRate} ms · Wurfdauer maximal {options.FeaturesCastTime} s.");
+        Log("session.detection", "Erkennung", $"Bobber: Template Matching · Forever-Bildvorlage · Größe 60–140 %, Drehung ±30°, Breite 80–120 %, Perspektive ±18 % · {DetectionSettings()} · Splash-Bildvergleich alle {options.PerformanceScanRate} ms · Kalibrierung {options.SplashCalibrationMilliseconds} ms · Wasserbewegung {(options.SplashAdaptiveThreshold ? "berücksichtigen" : "ignorieren")}.");
         Log("session.actions", "Aktionen", $"WoW schließen nach 60 s: {Triggers(options.FeaturesExitOnInactivity, options.FeaturesExitOnFullBag, options.FeaturesExitOnDeath)} · Windows herunterfahren nach 120 s: {Triggers(options.FeaturesShutdownOnInactivity, options.FeaturesShutdownOnFullBag, options.FeaturesShutdownOnDeath)}.");
         try
         {
@@ -101,11 +111,10 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                 nint foundGame = desktop.FindGame();
                 if (foundGame != game)
                 {
-                    castTime = lastSplash = null;
-                    splashArea = gameBounds = null;
-                    looted = bobberIncreased = splashIncreased = splashDecreased = timedOut = false;
+                    castTime = null;
+                    ResetObservation(); gameBounds = null;
+                    looted = timedOut = lootRequested = false;
                     splashDetected = false;
-                    increases = decreases = 0;
                     nextAction = now;
                     state = BotState.None;
                     game = foundGame;
@@ -120,7 +129,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                         lastGeometryLog = now;
                     }
                     // A changed layout invalidates the previous detection; find the bobber again.
-                    splashArea = null;
+                    ResetObservation();
                     gameBounds = currentBounds;
                     if (gameBounds is { } client)
                         bobberArea = Detection.Around(new(client.X + client.Width / 2, client.Y + client.Height / 2),
@@ -137,6 +146,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                 {
                     if (next == BotState.Idle && state == BotState.Fishing && splashDetected && !timedOut && !looted)
                         Log("cast.no-fish", "Angeln", "Kein Fisch angebissen · Wurf nach erkanntem Splash ohne Loot-Bestätigung beendet.", LogLevel.Warning);
+                    if (next != BotState.Fishing) ResetObservation();
                     state = next;
                     Log("state.changed", "Status", state switch
                     {
@@ -166,33 +176,18 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                         continue;
                     }
                 }
-                Publish(state == BotState.Fishing && !timedOut ? (splashArea != null ? "Splash suchen" : "Bobber suchen") : StateText(state));
+                Publish(state == BotState.Fishing && !timedOut ? FishingActivity() : StateText(state));
                 if (now >= nextAction && CanAct())
                 {
                     if (state == BotState.Idle)
                     {
-                        if (splashArea != null && options.SplashAreaAutoLearn && castTime != null && !looted && !splashDecreased)
-                        {
-                            if ((now - castTime.Value).TotalSeconds >= options.FeaturesCastTime)
-                            {
-                                options.SplashAreaTolerance = Math.Min(255, options.SplashAreaTolerance + 1);
-                                splashIncreased = true;
-                                if (options.BobberAreaAutoLearn && !bobberIncreased) options.BobberAreaTolerance = Math.Max(0, options.BobberAreaTolerance - 1);
-                                Log("learn.cast-expired", "Auto-Learn", $"Wurf ohne Loot abgelaufen. Splash-Toleranz angepasst, Bobber gegebenenfalls korrigiert. {Learning()}.");
-                            }
-                            else if (!splashIncreased)
-                            {
-                                options.SplashAreaTolerance = Math.Max(0, options.SplashAreaTolerance - 1);
-                                Log("learn.no-loot", "Auto-Learn", $"Kein Loot nach Splash. Splash-Toleranz angepasst. {Learning()}.");
-                            }
-                        }
+
                         cancellation.ThrowIfCancellationRequested();
                         desktop.Key(game, 0x31, cancellation);
                         castTime = now;
-                        splashArea = null;
-                        looted = splashDecreased = bobberIncreased = timedOut = false;
+                        ResetObservation();
+                        looted = timedOut = lootRequested = false;
                         splashDetected = false;
-                        increases = decreases = 0;
                         nextAction = now.AddSeconds(2);
                         casts++; Log("cast.requested", "Angeln", $"Wurf {casts} angefordert · Taste 1 gesendet · 2 s Wartezeit.");
                     }
@@ -219,50 +214,51 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
                                 await Task.Delay(options.PerformanceScanRate, cancellation).ConfigureAwait(false);
                                 continue;
                             }
-                            var hit = Detection.Find(frame, options.PerformanceSkip,
-                                splash ? options.SplashAreaTolerance : options.BobberAreaTolerance, splash);
-                            ScanMeasured?.Invoke(_time.GetUtcNow(), Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds);
-                            PreviewAvailable?.Invoke(frame, splash, hit != null);
-
-                            if (hit is { } point)
+                            var bobberMatch = splash ? null : _bobberMatcher.Find(frame, options.BobberMatchMinimum, cancellation);
+                            var analysis = splash ? motion.Analyze(frame, _time.GetUtcNow()) : null;
+                            if (!CanAct())
                             {
-                                if (splash) splashDetected = true;
-                                if (!splash)
-                                {
-                                    splashArea = Detection.Around(new(bounds.X + point.X, bounds.Y + point.Y), options.SplashAreaWidth,
-                                        options.SplashAreaHeight, options.SplashAreaXOffset, options.SplashAreaYOffset, gameBounds!.Value);
-                                    if (splashArea.Value.Width == 0 || splashArea.Value.Height == 0) throw new InvalidOperationException("Der Splash-Suchbereich liegt außerhalb des WoW-Fensters.");
-                                    nextAction = now.AddMilliseconds(500);
-                                    Publish("Splash suchen");
-                                    Log("bobber.found", "Erkennung", $"Bobber bei ({bounds.X + point.X}, {bounds.Y + point.Y}) gefunden · Toleranz {options.BobberAreaTolerance} · Splash-Suche {splashArea.Value.Width} × {splashArea.Value.Height} px.", LogLevel.Success);
-                                }
-                                else if (options.SplashAreaAutoLearn && lastSplash != null && (now - lastSplash.Value).TotalSeconds <= 5 && !splashIncreased)
-                                {
-                                    if (decreases < 10 && options.SplashAreaTolerance > 0)
-                                    {
-                                        options.SplashAreaTolerance--; decreases++; splashDecreased = true;
-                                        Log("learn.frequent-splash", "Auto-Learn", $"Splash innerhalb von 5 s erneut erkannt. Toleranz {options.SplashAreaTolerance + 1} → {options.SplashAreaTolerance} · Korrektur {decreases}/10.");
-                                    }
-                                    else if (CanAct()) { desktop.Key(game, 0x1b, cancellation); timedOut = true; Log("learn.limit", "Auto-Learn", $"Lerngrenze erreicht. Wurfabbruch per Escape angefordert. {Learning()}.", LogLevel.Warning); }
-                                    lastSplash = now;
-                                }
-                                else if (CanAct())
-                                {
-                                    await desktop.LootAsync(game, new(bounds.X + point.X, bounds.Y + point.Y), gameBounds!.Value, cancellation).ConfigureAwait(false);
-                                    lastSplash = now;
-                                    splashIncreased = false;
-                                    nextAction = now.AddMilliseconds(500);
-                                    lootRequests++; Log("loot.requested", "Loot", $"Splash bei ({bounds.X + point.X}, {bounds.Y + point.Y}) erkannt · Loot-Anfrage {lootRequests} · Bestätigung durch WeakAura steht aus.");
-                                }
+                                motion.Reset(); motionStatus = null;
+                                await Task.Delay(options.PerformanceScanRate, cancellation).ConfigureAwait(false);
+                                continue;
                             }
-                            else if (!splash && options.BobberAreaAutoLearn && (now - castTime.Value).TotalSeconds >= 3)
+                            ScanMeasured?.Invoke(_time.GetUtcNow(), Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds);
+                            var preview = analysis?.Preview ?? (bobberMatch == null ? frame : BobberTemplateMatcher.Mark(frame, bobberMatch));
+                            bool found = splash ? analysis!.Measurement.NewTrigger && !lootRequested : bobberMatch != null;
+                            PreviewAvailable?.Invoke(preview, splash, found, analysis?.Measurement);
+
+                            if (bobberMatch != null)
                             {
-                                if (increases < 10 && options.BobberAreaTolerance < 255)
+                                bobberPoint = new(bounds.X + bobberMatch.Point.X, bounds.Y + bobberMatch.Point.Y);
+                                splashArea = Detection.Around(bobberPoint.Value, options.SplashAreaWidth,
+                                    options.SplashAreaHeight, options.SplashAreaXOffset, options.SplashAreaYOffset, gameBounds!.Value);
+                                if (splashArea.Value.Width == 0 || splashArea.Value.Height == 0)
+                                    throw new InvalidOperationException("Der Splash-Suchbereich liegt außerhalb des WoW-Fensters.");
+                                motion.Reset(); motionStatus = null;
+                                nextAction = _time.GetUtcNow();
+                                Publish(FishingActivity());
+                                Log("bobber.found", "Erkennung", $"Bobber bei ({bobberPoint.Value.X}, {bobberPoint.Value.Y}) gefunden · Template {bobberMatch.Confidence:P1} · Größe {bobberMatch.Scale:P0} · Drehung {bobberMatch.RotationDegrees:F1}° · Breite {bobberMatch.AspectRatio:P0} · Perspektive {bobberMatch.Perspective:P1} · Splash-Vergleich {splashArea.Value.Width} × {splashArea.Value.Height} px.", LogLevel.Success);
+                            }
+                            else if (analysis != null)
+                            {
+                                motionStatus = analysis.Measurement;
+                                if (motionStatus.SceneChanged && !lootRequested)
                                 {
-                                    options.BobberAreaTolerance++; increases++; bobberIncreased = true;
-                                    Log("learn.no-bobber", "Auto-Learn", $"Kein Bobber nach {(now - castTime.Value).TotalSeconds:F1} s. Toleranz {options.BobberAreaTolerance - 1} → {options.BobberAreaTolerance} · Korrektur {increases}/10.");
+                                    ResetObservation();
+                                    if (lastMotionResetLog == null || (_time.GetUtcNow() - lastMotionResetLog.Value).TotalSeconds >= 3)
+                                    {
+                                        lastMotionResetLog = _time.GetUtcNow();
+                                        Log("splash.scene-changed", "Erkennung", "Großflächiger Bildwechsel. Referenz verworfen; Bobber neu suchen und Wasserbewegung kalibrieren.");
+                                    }
                                 }
-                                else if (CanAct()) { desktop.Key(game, 0x1b, cancellation); timedOut = true; Log("learn.limit", "Auto-Learn", $"Lerngrenze erreicht. Wurfabbruch per Escape angefordert. {Learning()}.", LogLevel.Warning); }
+                                else if (motionStatus.NewTrigger && !lootRequested && bobberPoint is { } point && CanAct())
+                                {
+                                    splashDetected = true; lootRequested = true;
+                                    await desktop.LootAsync(game, point, gameBounds!.Value, cancellation).ConfigureAwait(false);
+                                    lootRequests++;
+                                    Log("loot.requested", "Loot", $"Splash: {motionStatus.ChangedPercent:F1} % Änderung · Grenze {motionStatus.ThresholdPercent:F1} % · zusammenhängend {motionStatus.LargestComponentPercent:F1} % · Loot-Anfrage {lootRequests} am Bobber ({point.X}, {point.Y}) · Bestätigung steht aus.");
+                                }
+                                Publish(FishingActivity());
                             }
                         }
                     }
@@ -282,11 +278,11 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
         }
         finally
         {
-            Updated?.Invoke(new(state, "Gestoppt", null, null, options.BobberAreaTolerance, options.SplashAreaTolerance));
+            Updated?.Invoke(new(state, "Gestoppt", null, null, options.BobberMatchMinimum, options.SplashChangePercent));
             if (closeAt != null || shutdownAt != null)
                 Log("action.cancelled", "Countdown", "Ausstehende Folgeaktionen verworfen; kein weiterer Countdown aktiv.");
             var duration = _time.GetUtcNow() - startedAt;
-            Log("session.ended", "Sitzung", $"{endReason} · Dauer {duration.TotalMinutes:F1} min · {casts} Würfe angefordert · {lootRequests} Loot-Anfragen · {lootSignals} Loot-Bestätigungen · {timeouts} Timeouts. {Learning()}.");
+            Log("session.ended", "Sitzung", $"{endReason} · Dauer {duration.TotalMinutes:F1} min · {casts} Würfe angefordert · {lootRequests} Loot-Anfragen · {lootSignals} Loot-Bestätigungen · {timeouts} Timeouts. {DetectionSettings()}.");
         }
     }
 

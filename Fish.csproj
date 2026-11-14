@@ -26,7 +26,9 @@
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
     <Compile Remove="Tests\**\*.cs" />
+    <Content Remove="Tests\**" />
     <None Remove="Tests\**" />
+    <EmbeddedResource Include="Assets\Bobber\forever.png" LogicalName="Fish.Bobber.forever.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -56,15 +56,22 @@ try {
         }
     }
     if ($null -eq $window) { throw 'Fish window not found.' }
-    function Find-Element([string]$name) {
-        $condition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $name)
-        $element = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
-        if ($null -eq $element) { throw "Element not found: $name" }
-        return $element
+    function Find-Element([string]$name, [switch]$ById) {
+        $property = if ($ById) { [System.Windows.Automation.AutomationElement]::AutomationIdProperty } else { [System.Windows.Automation.AutomationElement]::NameProperty }
+        $condition = [System.Windows.Automation.PropertyCondition]::new($property, $name)
+        for ($attempt = 0; $attempt -lt 25; $attempt++) {
+            $element = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+            if ($null -ne $element) { return $element }
+            Start-Sleep -Milliseconds 200
+        }
+        throw "Element not found: $name"
     }
-    $start = Find-Element 'Angeln starten'
+    Find-Element 'Starten' | Out-Null
+    $start = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'StartButton'))
     if (!$start.Current.IsEnabled) { throw 'Start button should be enabled.' }
-    $stop = Find-Element 'Stop'
+    $stop = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'StopButton'))
     if ($stop.Current.IsEnabled) { throw 'Stop button should be disabled before starting.' }
     Write-Output 'PASS startup and initial control states'
     Start-Sleep -Milliseconds 1000
@@ -114,8 +121,15 @@ try {
     } else { Write-Output 'SKIP synthetic overlay window: WoW is already open.' }
     (Find-Element 'Erkennung').GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
     Start-Sleep -Milliseconds 300
-    $learn = Find-Element 'Bobber-Toleranz automatisch lernen'
-    $learn.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    $minimum = Find-Element 'BobberMatchMinimum' -ById
+    $inputCondition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+    $minimumInput = $minimum.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCondition)
+    $minimumInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('10')
+    (Find-Element 'SplashSettings' -ById).GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    $splashMinimum = Find-Element 'SplashChangePercent' -ById
+    $splashInput = $splashMinimum.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCondition)
+    $splashInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('7')
+    (Find-Element 'Aktionen').GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
     $window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
     if (!$process.WaitForExit(10000)) { throw 'Fish did not close cleanly.' }
     if ($process.ExitCode -ne 0) { throw "Fish exited with code $($process.ExitCode)" }
@@ -123,7 +137,8 @@ try {
     $settingsFile = Join-Path $settings 'appsettings.json'
     if (!(Test-Path -LiteralPath $settingsFile)) { throw 'Settings were not saved on close.' }
     $saved = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
-    if ($saved.BobberAreaAutoLearn) { throw 'Changed setting was not saved.' }
+    if ($saved.BobberMatchMinimum -ne 10) { throw 'Changed setting was not saved.' }
+    if ($saved.SplashChangePercent -ne 7 -or $saved.SplashPixelTolerance -ne 20 -or $saved.SplashCalibrationMilliseconds -ne 500) { throw 'Motion detection settings were not saved.' }
     Write-Output 'PASS automatic save on close'
     $process.Dispose()
     $process = Start-Process @launch
@@ -141,9 +156,13 @@ try {
     Start-Sleep -Milliseconds 1000
     (Find-Element 'Erkennung').GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
     Start-Sleep -Milliseconds 300
-    $learn = Find-Element 'Bobber-Toleranz automatisch lernen'
-    $state = $learn.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState
-    if ($state -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Saved setting was not restored.' }
+    $minimum = Find-Element 'BobberMatchMinimum' -ById
+    $minimumInput = $minimum.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCondition)
+    if ($minimumInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -ne '10') { throw 'Saved setting was not restored.' }
+    (Find-Element 'SplashSettings' -ById).GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    $splashMinimum = Find-Element 'SplashChangePercent' -ById
+    $splashInput = $splashMinimum.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCondition)
+    if ($splashInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -ne '7') { throw 'Motion detection setting was not restored.' }
     if (([FishSmokeNative]::GetWindowLongW($process.MainWindowHandle, -20) -band 8) -eq 0) { throw 'Restarted window is not topmost.' }
     Write-Output 'PASS automatic reload on restart'
     $window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()

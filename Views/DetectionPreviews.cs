@@ -47,10 +47,10 @@ public sealed class DetectionPreviews : Grid
         var frames = buffer.Take();
         if (frames.Live != null) _lastFrame = Environment.TickCount64;
         else if (Environment.TickCount64 - _lastFrame > 1000) PauseLive();
-        Show(0, frames.Bobber); Show(1, frames.Splash); Show(2, frames.Live);
+        Show(0, frames.Bobber); Show(1, frames.Splash, frames.SplashMotion); Show(2, frames.Live, frames.LiveMotion);
     }
 
-    private void Show(int index, PixelFrame? frame)
+    private void Show(int index, PixelFrame? frame, SplashMeasurement? motion = null)
     {
         if (frame == null) return;
         var bitmap = _images[index].Source as WriteableBitmap;
@@ -59,6 +59,6 @@ public sealed class DetectionPreviews : Grid
         using var stream = bitmap.PixelBuffer.AsStream();
         stream.Write(System.Runtime.InteropServices.MemoryMarshal.AsBytes(frame.Pixels.AsSpan()));
         bitmap.Invalidate();
-        _labels[index].Text = DateTime.Now.ToString("HH:mm:ss");
+        _labels[index].Text = DateTime.Now.ToString("HH:mm:ss") + (motion == null ? "" : "\n" + motion.Summary);
     }
 }

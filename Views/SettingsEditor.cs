@@ -13,21 +13,23 @@ internal static class SettingsEditor
         detection.Children.Clear(); features.Children.Clear();
         var scan = Group(detection, "Suchintervalle", "Geschwindigkeit und Genauigkeit", true);
         Number(scan, "Scan-Intervall", "ms", o.PerformanceScanRate, 100, 1000, v => { o.PerformanceScanRate = v; changed(); });
-        Number(scan, "Pixel überspringen", "pro Schritt", o.PerformanceSkip, 0, 10, v => { o.PerformanceSkip = v; changed(); });
-        var bobber = Group(detection, "Bobber", "Suchbereich relativ zur WoW-Fenstermitte", true);
+        var bobber = Group(detection, "Bobber", "Bildvorlage · Suchbereich relativ zur WoW-Fenstermitte", true);
         Number(bobber, "Breite", "px", o.BobberAreaWidth, 100, 3840, v => { o.BobberAreaWidth = v; changed(); });
         Number(bobber, "Höhe", "px", o.BobberAreaHeight, 100, 2160, v => { o.BobberAreaHeight = v; changed(); });
         Number(bobber, "X-Versatz", "zur Mitte · px", o.BobberAreaXOffset, -7680, 7680, v => { o.BobberAreaXOffset = v; changed(); });
         Number(bobber, "Y-Versatz", "nach oben · px", o.BobberAreaYOffset, -4320, 4320, v => { o.BobberAreaYOffset = v; changed(); });
-        Number(bobber, "Farbtoleranz", "0–255", o.BobberAreaTolerance, 0, 255, v => { o.BobberAreaTolerance = v; changed(); });
-        Toggle(bobber, "Toleranz automatisch lernen", o.BobberAreaAutoLearn, v => { o.BobberAreaAutoLearn = v; changed(); });
-        var splash = Group(detection, "Splash", "Suchbereich relativ zum erkannten Bobber", false);
+        Number(bobber, "Mindestübereinstimmung", "%", o.BobberMatchMinimum, 10, 99, v => { o.BobberMatchMinimum = v; changed(); }, "BobberMatchMinimum");
+        bobber.Children.Add(new TextBlock { Text = "Vorlage: Forever-Schwimmer. Die Suche berücksichtigt Größe, Drehung und perspektivische Verformung. Größere Werte verlangen ähnlichere Treffer. Fundbilder markieren den Schwimmer grün.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        var splash = Group(detection, "Splash", "Bildvergleich · Suchbereich relativ zum erkannten Bobber", false, "SplashSettings");
         Number(splash, "Breite", "px", o.SplashAreaWidth, 50, 1920, v => { o.SplashAreaWidth = v; changed(); });
         Number(splash, "Höhe", "px", o.SplashAreaHeight, 50, 1080, v => { o.SplashAreaHeight = v; changed(); });
         Number(splash, "X-Versatz", "zum Bobber · px", o.SplashAreaXOffset, -3840, 3840, v => { o.SplashAreaXOffset = v; changed(); });
         Number(splash, "Y-Versatz", "nach oben · px", o.SplashAreaYOffset, -2160, 2160, v => { o.SplashAreaYOffset = v; changed(); });
-        Number(splash, "Farbtoleranz", "0–255", o.SplashAreaTolerance, 0, 255, v => { o.SplashAreaTolerance = v; changed(); });
-        Toggle(splash, "Toleranz automatisch lernen", o.SplashAreaAutoLearn, v => { o.SplashAreaAutoLearn = v; changed(); });
+        Number(splash, "Pixel-Rauschtoleranz", "1–255", o.SplashPixelTolerance, 1, 255, v => { o.SplashPixelTolerance = v; changed(); }, "SplashPixelTolerance");
+        Number(splash, "Mindeständerung", "%", o.SplashChangePercent, 1, 80, v => { o.SplashChangePercent = v; changed(); }, "SplashChangePercent");
+        Number(splash, "Kalibrierung", "ms", o.SplashCalibrationMilliseconds, 300, 3000, v => { o.SplashCalibrationMilliseconds = v; changed(); }, "SplashCalibrationMilliseconds");
+        Toggle(splash, "Normale Wasserbewegung berücksichtigen", o.SplashAdaptiveThreshold, v => { o.SplashAdaptiveThreshold = v; changed(); });
+        splash.Children.Add(new TextBlock { Text = "Rot markierte Pixel zeigen Änderungen zum vorherigen Bild. Live zeigt Änderungsanteil, aktuelle Grenze und normale Bewegung. Nach einem Treffer erfolgt pro Wurf eine Loot-Anfrage am Schwimmer.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         var fishing = Group(features, "Angeln", "Taste 1 · automatisches Auswerfen", true);
         Number(fishing, "Maximale Wurfdauer", "Sekunden", o.FeaturesCastTime, 5, 25, v => { o.FeaturesCastTime = v; changed(); });
         var exit = Group(features, "WoW schließen", "60 Sekunden Countdown nach dem Auslöser", true);
@@ -40,17 +42,19 @@ internal static class SettingsEditor
         Toggle(shutdown, "Charakter tot", o.FeaturesShutdownOnDeath, v => { o.FeaturesShutdownOnDeath = v; changed(); });
     }
 
-    private static StackPanel Group(StackPanel parent, string title, string subtitle, bool expanded)
+    private static StackPanel Group(StackPanel parent, string title, string subtitle, bool expanded, string? automationId = null)
     {
         var header = new StackPanel { Spacing = 3 };
         header.Children.Add(new TextBlock { Text = title, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         header.Children.Add(new TextBlock { Text = subtitle, FontSize = 12, TextWrapping = TextWrapping.Wrap });
         var content = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Stretch };
-        parent.Children.Add(new Expander
+        var expander = new Expander
         {
             Header = header, Content = content, IsExpanded = expanded,
             HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, CornerRadius = new(10)
-        });
+        };
+        if (automationId != null) Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(expander, automationId);
+        parent.Children.Add(expander);
         return content;
     }
 
@@ -67,10 +71,12 @@ internal static class SettingsEditor
         return row;
     }
 
-    private static void Number(StackPanel panel, string label, string unit, int value, int min, int max, Action<int> write)
+    private static void Number(StackPanel panel, string label, string unit, int value, int min, int max, Action<int> write, string? automationId = null)
     {
         var row = Row(panel, label, unit);
         var control = new NumberBox { Value = value, Minimum = min, Maximum = max, Width = 116, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(control, label);
+        if (automationId != null) Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(control, automationId);
         control.ValueChanged += (_, args) => { if (double.IsFinite(args.NewValue)) write((int)Math.Clamp(Math.Round(args.NewValue), min, max)); };
         Grid.SetColumn(control, 1);
         row.Children.Add(control);

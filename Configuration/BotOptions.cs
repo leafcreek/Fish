@@ -16,19 +16,19 @@ public sealed class BotOptions
     public int WindowXPosition { get; set; }
     public int WindowYPosition { get; set; }
     public int PerformanceScanRate { get; set; } = 150;
-    public int PerformanceSkip { get; set; } = 2;
     public int BobberAreaWidth { get; set; } = 800;
     public int BobberAreaHeight { get; set; } = 400;
     public int BobberAreaXOffset { get; set; }
     public int BobberAreaYOffset { get; set; } = 30;
-    public int BobberAreaTolerance { get; set; } = 200;
-    public bool BobberAreaAutoLearn { get; set; } = true;
+    public int BobberMatchMinimum { get; set; } = 80;
     public int SplashAreaWidth { get; set; } = 120;
     public int SplashAreaHeight { get; set; } = 100;
     public int SplashAreaXOffset { get; set; } = 30;
     public int SplashAreaYOffset { get; set; }
-    public int SplashAreaTolerance { get; set; } = 70;
-    public bool SplashAreaAutoLearn { get; set; } = true;
+    public int SplashPixelTolerance { get; set; } = 20;
+    public int SplashChangePercent { get; set; } = 5;
+    public bool SplashAdaptiveThreshold { get; set; } = true;
+    public int SplashCalibrationMilliseconds { get; set; } = 500;
     public bool FeaturesExitOnInactivity { get; set; }
     public bool FeaturesExitOnFullBag { get; set; }
     public bool FeaturesExitOnDeath { get; set; }
@@ -46,7 +46,6 @@ public sealed class BotOptions
         WindowWidth = Math.Clamp(WindowWidth, 720, 7680);
         WindowHeight = Math.Clamp(WindowHeight, 540, 4320);
         PerformanceScanRate = Math.Clamp(PerformanceScanRate, 100, 1000);
-        PerformanceSkip = Math.Clamp(PerformanceSkip, 0, 10);
         BobberAreaWidth = Math.Clamp(BobberAreaWidth, 100, 3840);
         BobberAreaHeight = Math.Clamp(BobberAreaHeight, 100, 2160);
         SplashAreaWidth = Math.Clamp(SplashAreaWidth, 50, 1920);
@@ -55,8 +54,10 @@ public sealed class BotOptions
         BobberAreaYOffset = Math.Clamp(BobberAreaYOffset, -4320, 4320);
         SplashAreaXOffset = Math.Clamp(SplashAreaXOffset, -3840, 3840);
         SplashAreaYOffset = Math.Clamp(SplashAreaYOffset, -2160, 2160);
-        BobberAreaTolerance = Math.Clamp(BobberAreaTolerance, 0, 255);
-        SplashAreaTolerance = Math.Clamp(SplashAreaTolerance, 0, 255);
+        BobberMatchMinimum = Math.Clamp(BobberMatchMinimum, 10, 99);
+        SplashPixelTolerance = Math.Clamp(SplashPixelTolerance, 1, 255);
+        SplashChangePercent = Math.Clamp(SplashChangePercent, 1, 80);
+        SplashCalibrationMilliseconds = Math.Clamp(SplashCalibrationMilliseconds, 300, 3000);
         FeaturesCastTime = Math.Clamp(FeaturesCastTime, 5, 25);
     }
 }

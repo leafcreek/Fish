@@ -11,19 +11,21 @@ dotnet run --project Fish.csproj
 
 WoW wird automatisch anhand seines Fensters gefunden und muss sichtbar sein. Angeln liegt auf Taste **1**. Der Statuspixel muss ganz oben links in der WoW-Spielfläche (ohne Titelleiste und Rahmen) angezeigt werden.
 
+Das eigenständige WoW-Forever-Addon **FishHelper** liegt unter [`addon/FishHelper`](addon/FishHelper/README.md). Den Ordner nach `Interface\AddOns` der Forever-Installation kopieren und den Client neu starten. Es erzeugt die bestehenden Statusfarben ohne WeakAuras-Abhängigkeit. Installation, Diagnose und offene Prüfungen im Spiel stehen in der verlinkten Anleitung.
+
 Während einer Sitzung sind Einstellungen gesperrt. **Stop** bricht den Bot und ausstehende Countdowns ab.
 
 ## Oberfläche
 
 Kompakte Oberfläche mit Dark- und Light-Theme, den Tabs Übersicht, Erkennung, Aktionen und Anwendung sowie aufklappbaren Einstellungsgruppen. Status, Aktivitätsprotokoll und drei kompakte Bildvorschauen begleiten die Sitzung. WinUI-Übergänge und eine animierte Sitzungsanzeige zeigen Wechsel und laufende Sitzungen an. Neue Fenster starten mit 760 × 740 Pixeln; gespeicherte Fenstergrößen bleiben erhalten.
 
-Das Protokoll hält die neuesten 300 Einträge mit Ereigniszeit, Kategorie und Stufe (Info, OK, Warnung, Fehler). Es dokumentiert Startkonfiguration, Fundpunkte, Auto-Learn, Folgeaktionen und eine Sitzungsbilanz. Loot-Anfragen und WeakAura-Loot-Bestätigungen werden getrennt gezählt; das ist keine Anzahl gefangener Fische. Es wird kein dauerhaftes Sitzungslog geschrieben. Fensterbewegungen werden höchstens alle drei Sekunden protokolliert.
+Das Protokoll hält die neuesten 300 Einträge mit Ereigniszeit, Kategorie und Stufe (Info, OK, Warnung, Fehler). Es dokumentiert Startkonfiguration, Fundpunkte, Bewegungserkennung, Folgeaktionen und eine Sitzungsbilanz. Loot-Anfragen und WeakAura-Loot-Bestätigungen werden getrennt gezählt; das ist keine Anzahl gefangener Fische. Es wird kein dauerhaftes Sitzungslog geschrieben. Fensterbewegungen werden höchstens alle drei Sekunden protokolliert.
 
 ## Anwendung
 
 Der Reiter **Anwendung** enthält Darstellungs-, Tray-, Tastatur- und Updatefunktionen.
 
-- Änderungen an Einstellungen werden nach 400 ms Eingabepause gespeichert, Fensterposition und normale Fenstergröße ebenfalls. Gelernte Toleranzen werden während der Sitzung und beim Stop übernommen. Fehler werden sichtbar gemeldet; eine nicht lesbare Einstellungsdatei wird nicht überschrieben.
+- Änderungen an Einstellungen werden nach 400 ms Eingabepause gespeichert, Fensterposition und normale Fenstergröße ebenfalls. Fehler werden sichtbar gemeldet; eine nicht lesbare Einstellungsdatei wird nicht überschrieben.
 - Minimieren blendet Fish standardmäßig in den Windows-Tray aus. Schließen beendet weiterhin die Anwendung, sofern „Beim Schließen in den Tray“ nicht aktiviert wurde. Das Tray-Menü bietet Öffnen, Starten, Stoppen und Beenden. Bei fehlendem Tray-Symbol bleibt das Fenster erreichbar.
 - Die manuelle Updateprüfung fragt die neueste stabile GitHub-Veröffentlichung von `leafcreek/Fish` ab. Tags müssen beispielsweise `v1.2.3` heißen. Das Ergebnis erscheint als Dialog; bei einer neuen Version öffnet dessen Download-Schaltfläche die GitHub-Release-Seite. Es gibt keinen automatischen Installer oder Hintergrunddownload. Die Produktversion stammt aus der Assembly-Version; für neue Releases muss sie im Projekt passend zum Tag gesetzt werden.
 
@@ -50,26 +52,30 @@ Gesamtzahlen, Timeouts und Sitzungsdauer bleiben nach Stop erhalten. CPU/RAM-Gra
 
 ## Einstellungen
 
-Fish speichert Änderungen automatisch nach 400 ms Eingabepause und zusätzlich beim Beenden in `appsettings.json` neben der EXE und lädt sie beim nächsten Start wieder. Dazu gehören Fensterposition und -größe, Steuerung, Erkennungswerte einschließlich gelernter Toleranzen sowie Folgeaktionen. Beim Speichern entsteht eine `.bak`-Datei. Der EXE-Ordner muss beschreibbar sein; bei einem Schreibfehler erscheint eine Meldung. Bisherige Einstellungen unter `%APPDATA%` werden nicht mehr geladen.
+Fish speichert Änderungen automatisch nach 400 ms Eingabepause und zusätzlich beim Beenden in `appsettings.json` neben der EXE und lädt sie beim nächsten Start wieder. Dazu gehören Fensterposition und -größe, Steuerung, Erkennungswerte und Bewegungsgrenzen sowie Folgeaktionen. Beim Speichern entsteht eine `.bak`-Datei. Der EXE-Ordner muss beschreibbar sein; bei einem Schreibfehler erscheint eine Meldung. Bisherige Einstellungen unter `%APPDATA%` werden nicht mehr geladen.
 
 | Eigenschaft | Standardwert |
 | --- | --- |
-| Übersprungene Pixel | 2 |
 | Bobber-Breite | 800 px |
 | Bobber-Höhe | 400 px |
 | Bobber-Y-Versatz nach oben | 30 px |
-| Bobber-Farbtoleranz | 200 |
-| Bobber automatisch lernen | Ein |
-| Splash-Farbtoleranz | 70 |
-| Splash automatisch lernen | Ein |
+| Bobber-Mindestübereinstimmung | 80 % |
+| Splash-Pixel-Rauschtoleranz | 20 |
+| Splash-Mindeständerung | 5 % |
+| Splash-Kalibrierung | 500 ms |
+| Normale Wasserbewegung berücksichtigen | Ein |
 
 Defaults gelten für neue Einstellungen und fehlende JSON-Felder. Bereits gespeicherte Werte haben Vorrang.
 
+Die Bobber-Suche verwendet Template Matching mit der eingebetteten [Forever-Bildvorlage](Assets/Bobber/README.md) aus dem bereitgestellten transparenten PNG. Sie prüft Größen von 60 bis 140 Prozent, Drehungen von ±30°, Breitenfaktoren von 80 bis 120 Prozent und perspektivische Verformungen. Die Suche vergleicht die Helligkeitsstruktur unter Berücksichtigung der Alphamaske und der aus der Vorlage ermittelten Körperfarbe und wählt den besten Treffer oberhalb der **Mindestübereinstimmung** (einstellbar von 10 bis 99 %). Der Wert beschreibt die Ähnlichkeit, keine Trefferwahrscheinlichkeit. Größere Werte sind strenger. Die Bobber-Vorschau markiert Treffer grün und kennzeichnet den Anker im Schwimmerkörper; das Protokoll nennt Übereinstimmung, Größe, Drehung, Verformung und Fundpunkt. Der Körper-Anker wird automatisch aus der PNG-Maske bestimmt und bei allen Verformungen mitgeführt. Die Mindestübereinstimmung wird nicht automatisch gelernt. Alte Bobber-Farbtoleranz-/Auto-Learn-Werte werden ignoriert.
+
+Die [Splash-Erkennung](docs/splash-motion.md) vergleicht jedes Bild mit dem vorherigen Rohbild. Rote Pixel in der Live-Vorschau markieren deutliche Änderungen; darunter stehen Änderungsanteil, wirksame Grenze und normale Wasserbewegung. Nach Kalibrierung und ausreichender zusammenhängender Bewegung wird genau eine Loot-Anfrage pro Wurf am erkannten Schwimmer gesendet. Die Wasser-Baseline wird bei jedem neuen Wurf oder Referenzwechsel neu ermittelt. Alte Splash-Farbtoleranz-/Auto-Learn-/Pixel-Schritt-Einstellungen werden ignoriert; die Geometrie bleibt erhalten.
+
 ## Verhalten und Aufbau
 
-Die UI-unabhängige Engine in `Core` verarbeitet WeakAura-Zustände, Bobber-/Splash-Erkennung, Auto-Learn, Cast, Loot und Timeout. `Services` enthält die Desktop-Anbindung, `Native` die Win32-Aufrufe und durchklickbaren Overlays. `Configuration` verwaltet die Einstellungen; `Views` und `ViewModels` die Oberfläche.
+Die UI-unabhängige Engine in `Core` verarbeitet WeakAura-Zustände, Bobber-/Splash-Erkennung, Bewegungskalibrierung, Cast, Loot und Timeout. `Services` enthält die Desktop-Anbindung, `Native` die Win32-Aufrufe und durchklickbaren Overlays. `Configuration` verwaltet die Einstellungen; `Views` und `ViewModels` die Oberfläche.
 
-WoW darf grundsätzlich inaktiv sein, muss aber weiterhin sichtbar sein. Fish bleibt bei aktivierter Option „Immer im Vordergrund“ über normalen Fenstern, ohne den Tastaturfokus zu übernehmen. Verdecktes oder minimiertes WoW wird nicht zuverlässig erfasst. Suchbereiche beziehen sich auf die Mitte der WoW-Spielfläche und folgen dem Fenster beim Verschieben und bei Größenänderungen. Dabei werden alte Fundkoordinaten verworfen und der Bobber erneut gesucht. Minimieren von WoW pausiert Aufnahme und Eingaben und blendet die Bereiche aus. Die Erkennung verwendet immer die rote Feder. Beide Suchbereiche sind auch vor dem Start und nach Stop sichtbar; Änderungen an ihrer Größe und Position werden laufend angezeigt. Ohne erkannten Bobber zeigt der Splash-Rahmen eine Größenvorschau relativ zur Mitte des Bobber-Suchbereichs. Minimieren von Fish blendet die Rahmen nicht aus.
+WoW darf grundsätzlich inaktiv sein, muss aber weiterhin sichtbar sein. Fish bleibt bei aktivierter Option „Immer im Vordergrund“ über normalen Fenstern, ohne den Tastaturfokus zu übernehmen. Verdecktes oder minimiertes WoW wird nicht zuverlässig erfasst. Suchbereiche beziehen sich auf die Mitte der WoW-Spielfläche und folgen dem Fenster beim Verschieben und bei Größenänderungen. Dabei werden alte Fundkoordinaten verworfen und der Bobber erneut gesucht. Minimieren von WoW pausiert Aufnahme und Eingaben und blendet die Bereiche aus. Die Bobber-Erkennung verwendet die eingebettete Forever-Bildvorlage; die Bisserkennung vergleicht aufeinanderfolgende Bilder des Splash-Bereichs. Der Fundpunkt liegt jetzt im Schwimmerkörper, deshalb kann der bisherige Splash-Versatz eine Anpassung benötigen. Beide Suchbereiche sind auch vor dem Start und nach Stop sichtbar; Änderungen an ihrer Größe und Position werden laufend angezeigt. Ohne erkannten Bobber zeigt der Splash-Rahmen eine Größenvorschau relativ zur Mitte des Bobber-Suchbereichs. Minimieren von Fish blendet die Rahmen nicht aus.
 
 Inaktivität bedeutet 120 Sekunden ohne Loot. Optionale Folgeaktionen gelten nur während einer gestarteten Sitzung: WoW nach 60 Sekunden schließen, Windows nach 120 Sekunden herunterfahren. Beide Countdowns beginnen beim selben Ereignis; Stop bricht sie ab.
 

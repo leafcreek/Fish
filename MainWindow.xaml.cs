@@ -88,7 +88,7 @@ public sealed partial class MainWindow : Window
     private void RebuildSettings()
     {
         SettingsEditor.Build(DetectionPanel, FeaturesPanel, _options, ScheduleSave);
-        _viewModel.Tolerances = $"Toleranz · Bobber {_options.BobberAreaTolerance} · Splash {_options.SplashAreaTolerance}";
+        _viewModel.Tolerances = $"Bobber ≥ {_options.BobberMatchMinimum} % · Splash ab {_options.SplashChangePercent} %";
     }
     private void ApplyTopmost()
     {
@@ -134,7 +134,6 @@ public sealed partial class MainWindow : Window
         var engine = new BotEngine(new BotDesktop());
         BotUpdate? pendingUpdate = null;
         int updateQueued = 0;
-        int bobberTolerance = _options.BobberAreaTolerance, splashTolerance = _options.SplashAreaTolerance;
         var metrics = _metrics;
         engine.ScanMeasured += metrics.RecordScan;
         engine.PreviewAvailable += _previews.Add;
@@ -145,8 +144,6 @@ public sealed partial class MainWindow : Window
         };
         engine.Updated += update =>
         {
-            bobberTolerance = update.BobberTolerance;
-            splashTolerance = update.SplashTolerance;
             Interlocked.Exchange(ref pendingUpdate, update);
             if (Interlocked.Exchange(ref updateQueued, 1) == 0)
                 DispatcherQueue.TryEnqueue(() =>
@@ -173,8 +170,6 @@ public sealed partial class MainWindow : Window
         finally
         {
             cancellation.Cancel();
-            _options.BobberAreaTolerance = bobberTolerance;
-            _options.SplashAreaTolerance = splashTolerance;
             _sessionId++;
 
             PreviewPanel.Refresh(_previews);
@@ -225,15 +220,10 @@ public sealed partial class MainWindow : Window
     {
         _viewModel.Status = BotEngine.StateText(update.State);
         _viewModel.Activity = update.Activity;
-        _viewModel.Tolerances = $"Toleranz · Bobber {update.BobberTolerance} · Splash {update.SplashTolerance}";
-        if (_options.BobberAreaTolerance != update.BobberTolerance || _options.SplashAreaTolerance != update.SplashTolerance)
-        {
-            _options.BobberAreaTolerance = update.BobberTolerance; _options.SplashAreaTolerance = update.SplashTolerance;
-            ScheduleSave();
-        }
+        _viewModel.Tolerances = $"Bobber ≥ {update.BobberMatchMinimum} % · Splash ab {update.SplashChangePercent} %";
         _tray?.SetStatus(_viewModel.Status);
         _displayed = update;
-        if (update.State != BotState.Fishing) PreviewPanel.PauseLive();
+        if (update.State != BotState.Fishing) { _previews.ClearLive(); PreviewPanel.PauseLive(); }
         UpdateOverlays();
     }
     private void UpdateOverlays()

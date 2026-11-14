@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../Assets/Bobber/forever.png" LogicalName="Fish.Bobber.forever.png" />
+    <EmbeddedResource Include="Fixtures/forever-water.png" LogicalName="Fish.Tests.forever-water.png" />
     <Compile Include="../ViewModels/MainViewModel.cs" Link="ViewModels/MainViewModel.cs" />
     <Compile Include="../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
     <Compile Include="../Configuration/*.cs" Link="Configuration/%(Filename)%(Extension)" />

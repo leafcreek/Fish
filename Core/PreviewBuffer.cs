@@ -5,29 +5,36 @@ public sealed class PreviewBuffer
 {
     private readonly object _gate = new();
     private PixelFrame? _live, _bobber, _splash;
+    private SplashMeasurement? _liveMotion, _splashMotion;
     private long _lastLive;
 
-    public void Add(PixelFrame frame, bool splash, bool found)
+    public void Add(PixelFrame frame, bool splash, bool found, SplashMeasurement? motion = null)
     {
         lock (_gate)
         {
             long now = Environment.TickCount64;
-            bool live = now - _lastLive >= 200;
+            bool live = found || now - _lastLive >= 200;
             if (!live && !found) return;
             var copy = Copy(frame);
-            if (live) { _live = copy; _lastLive = now; }
-            if (found) { if (splash) _splash = copy; else _bobber = copy; }
+            if (live) { _live = copy; _liveMotion = motion; _lastLive = now; }
+            if (found) { if (splash) { _splash = copy; _splashMotion = motion; } else _bobber = copy; }
         }
     }
 
-    public (PixelFrame? Live, PixelFrame? Bobber, PixelFrame? Splash) Take()
+    public (PixelFrame? Live, PixelFrame? Bobber, PixelFrame? Splash, SplashMeasurement? LiveMotion, SplashMeasurement? SplashMotion) Take()
     {
         lock (_gate)
         {
-            var result = (_live, _bobber, _splash);
+            var result = (_live, _bobber, _splash, _liveMotion, _splashMotion);
             _live = _bobber = _splash = null;
+            _liveMotion = _splashMotion = null;
             return result;
         }
+    }
+
+    public void ClearLive()
+    {
+        lock (_gate) { _live = null; _liveMotion = null; }
     }
 
     private static PixelFrame Copy(PixelFrame frame)
