@@ -12,5 +12,8 @@ public partial class App : Application
         string? settingsDirectory = settingsIndex >= 0 && settingsIndex + 1 < arguments.Length ? arguments[settingsIndex + 1] : null;
         _window = new MainWindow(settingsDirectory);
         _window.Activate();
+        if (Services.Updates.UpdateInstaller.NotifyStartup(arguments) is { } error)
+            ((MainWindow)_window).ShowUpdateError(error);
+        _ = Task.Run(Services.Updates.UpdateInstaller.CleanOldDownloads);
     }
 }

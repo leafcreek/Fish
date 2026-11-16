@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
         _store = new(settingsDirectory);
         InitializeComponent();
         Title = "Fish";
+        InitializeChrome();
         Root.DataContext = _viewModel;
         try { _options = _store.Load(); }
         catch (Exception ex) { _saveAllowed = false; ShowError("Einstellungen konnten nicht geladen werden. Die Datei bleibt erhalten. " + ex.Message); }
@@ -104,13 +105,23 @@ public sealed partial class MainWindow : Window
         bool awaitSession = _session is { IsCompleted: false };
         args.Cancel = awaitSession;
         _closing = true;
+        _updateCancellation?.Cancel();
+        _updateDialog?.Hide();
         _saveTimer?.Stop();
         SessionButton.IsEnabled = false;
         _cancellation?.Cancel();
         if (awaitSession) await _session!;
-        try { if (_saveAllowed) SaveSettings(); }
+        try
+        {
+            if (_saveAllowed) SaveSettings();
+            _updateHandoff?.Approve();
+            _updateHandoff?.Dispose();
+            _updateHandoff = null;
+        }
         catch (Exception ex)
         {
+            _updateHandoff?.Dispose();
+            _updateHandoff = null;
             args.Cancel = true;
             _closing = false;
             RestoreWindow();

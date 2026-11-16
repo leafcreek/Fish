@@ -25,8 +25,12 @@ public sealed partial class MainWindow
         AppWindow.TitleBar.ButtonForegroundColor = Appearance.Text;
         AppWindow.TitleBar.InactiveBackgroundColor = Appearance.Background;
         AppWindow.TitleBar.InactiveForegroundColor = Appearance.Text;
-        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Appearance.Background;
+        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveForegroundColor = Appearance.Text;
+        AppWindow.TitleBar.ButtonHoverBackgroundColor = Appearance.AccentSoft.Color;
+        AppWindow.TitleBar.ButtonHoverForegroundColor = Appearance.Text;
+        AppWindow.TitleBar.ButtonPressedBackgroundColor = Appearance.Track.Color;
+        AppWindow.TitleBar.ButtonPressedForegroundColor = Appearance.Text;
         RefreshSessionAppearance();
         RefreshStepProgress();
     }

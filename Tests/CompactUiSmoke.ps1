@@ -20,13 +20,29 @@ public static class FishCompactWindow {
     [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(Point point);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+    private static void MouseAt(int x, int y, uint button) {
+        int left=GetSystemMetrics(76), top=GetSystemMetrics(77), width=GetSystemMetrics(78), height=GetSystemMetrics(79);
+        uint nx=(uint)Math.Max(0,Math.Min(65535,(x-left+.5)*65536.0/width));
+        uint ny=(uint)Math.Max(0,Math.Min(65535,(y-top+.5)*65536.0/height));
+        mouse_event(0x8000|0x4000|1|button,nx,ny,0,UIntPtr.Zero);
+    }
     public static void ClickOwn(uint process, int x, int y) {
         if ((GetAsyncKeyState(1) & 0x8000) != 0) throw new InvalidOperationException("Release the mouse button before the test.");
         SetCursorPos(x,y);
         uint owner; GetWindowThreadProcessId(WindowFromPoint(new Point { X=x,Y=y }), out owner);
         if (owner != process) throw new InvalidOperationException("Refusing to click outside the test's own window.");
-        mouse_event(2,0,0,0,UIntPtr.Zero); mouse_event(4,0,0,0,UIntPtr.Zero);
+        MouseAt(x,y,2); System.Threading.Thread.Sleep(25); MouseAt(x,y,4);
+    }
+    public static void DragOwn(uint process, int x, int y, int dx, int dy) {
+        if ((GetAsyncKeyState(1) & 0x8000) != 0) throw new InvalidOperationException("Release the mouse button before the test.");
+        SetCursorPos(x,y);
+        uint owner; GetWindowThreadProcessId(WindowFromPoint(new Point { X=x,Y=y }), out owner);
+        if (owner != process) throw new InvalidOperationException("Refusing to drag outside the test's own window.");
+        MouseAt(x,y,2);
+        try { System.Threading.Thread.Sleep(120); MouseAt(x+dx,y+dy,0); System.Threading.Thread.Sleep(120); }
+        finally { MouseAt(x+dx,y+dy,4); }
     }
 }
 "@
@@ -87,6 +103,26 @@ try {
         if ([FishCompactWindow]::SendMessageW($handle,0x7f,[IntPtr]::new($icon),[IntPtr]::Zero) -eq [IntPtr]::Zero) { throw 'Goldfish icon is missing.' }
     }
     Write-Output 'PASS fixed 480x400 startup; resize and maximize disabled; monitoring collapsed; goldfish icons present'
+    $titleBar = Element 'AppTitleBar'
+    $version = Element 'VersionText'
+    $expectedVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($launch.FilePath).ProductVersion.Split('+')[0]
+    if ($version.Current.Name -ne ('Fish Version ' + $expectedVersion) -or $version.Current.IsOffscreen -or
+        $version.Current.BoundingRectangle.Top -le $monitor.Current.BoundingRectangle.Bottom) { throw 'Footer does not show the actual build version below the content.' }
+    if ($titleBar.Current.IsOffscreen -or $titleBar.Current.Name -ne 'Fish-Titelleiste') { throw 'Custom title bar is missing.' }
+    $beforeDrag = Bounds; $dragArea = $titleBar.Current.BoundingRectangle
+    $dragX = [int]($dragArea.Left+120*$scale); $dragY = [int]($dragArea.Top+$dragArea.Height/2)
+    $dragHit = [FishCompactWindow]::SendMessageW($handle,0x84,[IntPtr]::Zero,[IntPtr]::new(($dragY -shl 16) -bor ($dragX -band 65535)))
+    [FishCompactWindow]::DragOwn($app.Id,[int]($dragArea.Left+120*$scale),[int]($dragArea.Top+$dragArea.Height/2),32,24)
+    Start-Sleep -Milliseconds 250
+    $afterDrag = Bounds
+    # Windows may apply drag thresholds or snap offsets; verify actual movement and unchanged size.
+    if ($dragHit -ne [IntPtr]::new(2) -or [Math]::Abs($afterDrag.Left-$beforeDrag.Left) -lt 8 -or
+        [Math]::Abs($afterDrag.Top-$beforeDrag.Top) -lt 8 -or
+        ($afterDrag.Right-$afterDrag.Left) -ne ($beforeDrag.Right-$beforeDrag.Left) -or
+        ($afterDrag.Bottom-$afterDrag.Top) -ne ($beforeDrag.Bottom-$beforeDrag.Top)) {
+        throw "Dragging the custom title bar does not move the window: hit=$dragHit, before=$($beforeDrag.Left),$($beforeDrag.Top), after=$($afterDrag.Left),$($afterDrag.Top), title=$dragArea"
+    }
+    Write-Output 'PASS custom title bar drags natively; footer shows the actual assembly version'
     $button = Element 'SessionButton'
     $progress = Element 'StepTimeProgress'
     if ($button.Current.Name -ne 'Starten' -or $button.Current.BoundingRectangle.Bottom -gt $progress.Current.BoundingRectangle.Top -or
@@ -101,13 +137,26 @@ try {
         if ((Element $id).Current.BoundingRectangle.Width -lt $viewport.Width-36*$scale) { throw "Slider is not full width: $id" }
     }
     foreach ($label in @('Gering','Hoch')) {
-        if ((Named $label).Count -ne 0) { throw "Repeated endpoint text remains: $label" }
+        $labels = Named $label
+        if ($labels.Count -ne 1) { throw "Expected one shared endpoint label: $label" }
+        if ($labels[0].Current.BoundingRectangle.Top -lt (Element 'SplashSensitivity').Current.BoundingRectangle.Bottom-1) {
+            throw "Endpoint label is not below the Spritzer slider: $label"
+        }
     }
-    if ((Named 'Gering ↔ Hoch').Count -ne 1 -or (Named 'Erkennungstoleranz').Count -ne 1) { throw 'Expected one shared tolerance direction label.' }
+    $low = (Named 'Gering')[0].Current.BoundingRectangle; $high = (Named 'Hoch')[0].Current.BoundingRectangle
+    $sliderBounds = (Element 'SplashSensitivity').Current.BoundingRectangle
+    if ([Math]::Abs($low.Left-$sliderBounds.Left) -gt 2 -or [Math]::Abs($high.Right-$sliderBounds.Right) -gt 2 -or
+        (Named 'Gering ↔ Hoch').Count -ne 0) { throw 'Shared tolerance endpoints are not aligned at the slider edges.' }
+    foreach ($id in @('FooterState','FooterStatusDot')) {
+        if ($root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,$id))) {
+            throw "Removed footer status remains: $id"
+        }
+    }
     if ((Element 'FishingHotkey').Current.BoundingRectangle.Width -gt 100*$scale) { throw 'Hotkey input is still too wide.' }
     if ($monitor.Current.IsOffscreen -or $monitor.Current.BoundingRectangle.Bottom -gt $viewport.Bottom+1) { throw 'Monitoring header is clipped.' }
     Capture 'compact-default.png'
-    Write-Output 'PASS one shared Gering/Hoch label; full-width sliders; narrower hotkey input; all compact controls visible'
+    Write-Output 'PASS shared Gering/Hoch endpoints below both sliders; footer has version only; all compact controls visible'
     # Even an external programmatic size change must return to the selected fixed layout.
     [FishCompactWindow]::SetWindowPos($handle,[IntPtr]::Zero,0,0,[int](600*$scale),[int](600*$scale),0x0016) | Out-Null
     Start-Sleep -Milliseconds 400
@@ -143,19 +192,35 @@ try {
     Write-Output 'PASS repeated monitoring toggles restore exact heights without width drift'
     function Click-Monitor {
         $header = $monitor.Current.BoundingRectangle
+        $x = [int]($header.Left+$header.Width/2); $y = [int]($header.Top+16*$scale)
+        $hit = [FishCompactWindow]::SendMessageW($handle,0x84,[IntPtr]::Zero,[IntPtr]::new(($y -shl 16) -bor ($x -band 65535)))
+        if ($hit -ne [IntPtr]::new(1)) { throw "Monitoring header is incorrectly part of the native caption: hit=$hit" }
         [FishCompactWindow]::ClickOwn($app.Id,[int]($header.Left+$header.Width/2),[int]($header.Top+16*$scale))
+    }
+    function Wait-Monitor([string]$state, [int]$height) {
+        for ($attempt=0; $attempt -lt 20; $attempt++) {
+            $rect = Bounds
+            if ($expander.Current.ExpandCollapseState -eq $state -and ($rect.Bottom-$rect.Top) -eq $height) { return }
+            Start-Sleep -Milliseconds 50
+        }
     }
     foreach ($cycle in 1..12) {
         Click-Monitor
-        Start-Sleep -Milliseconds 180
+        Wait-Monitor 'Collapsed' ($compact.Bottom-$compact.Top)
         $rect = Bounds
         if ($expander.Current.ExpandCollapseState -ne 'Collapsed' -or ($rect.Right-$rect.Left) -ne ($compact.Right-$compact.Left) -or
-            ($rect.Bottom-$rect.Top) -ne ($compact.Bottom-$compact.Top)) { throw "Native collapse changed dimensions in cycle $cycle" }
+            ($rect.Bottom-$rect.Top) -ne ($compact.Bottom-$compact.Top)) {
+            Capture 'native-collapse-debug.png'
+            throw "Native collapse changed dimensions in cycle ${cycle}: state=$($expander.Current.ExpandCollapseState), actual=$($rect.Right-$rect.Left)x$($rect.Bottom-$rect.Top), expected=$($compact.Right-$compact.Left)x$($compact.Bottom-$compact.Top)"
+        }
         Click-Monitor
-        Start-Sleep -Milliseconds 180
+        Wait-Monitor 'Expanded' ($expanded.Bottom-$expanded.Top)
         $rect = Bounds
         if ($expander.Current.ExpandCollapseState -ne 'Expanded' -or ($rect.Right-$rect.Left) -ne ($expanded.Right-$expanded.Left) -or
-            ($rect.Bottom-$rect.Top) -ne ($expanded.Bottom-$expanded.Top)) { throw "Native expansion changed dimensions in cycle $cycle" }
+            ($rect.Bottom-$rect.Top) -ne ($expanded.Bottom-$expanded.Top)) {
+            Capture 'native-expansion-debug.png'
+            throw "Native expansion changed dimensions in cycle ${cycle}: state=$($expander.Current.ExpandCollapseState), actual=$($rect.Right-$rect.Left)x$($rect.Bottom-$rect.Top), expected=$($expanded.Right-$expanded.Left)x$($expanded.Bottom-$expanded.Top)"
+        }
     }
     foreach ($cycle in 1..8) { Click-Monitor; Start-Sleep -Milliseconds 40; Click-Monitor; Start-Sleep -Milliseconds 40 }
     Start-Sleep -Milliseconds 700

@@ -14,18 +14,20 @@ internal sealed class SettingsEditor
         var editor = new HotkeyEditor(options.FishingHotkey, value => { options.FishingHotkey = value; changed(); }) { Width = 145 };
         Grid.SetColumn(editor, 1); hotkey.Children.Add(editor);
 
-        var tolerance = new StackPanel { Spacing = 2, Margin = new(0, 4, 0, 0) };
-        var heading = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        heading.Children.Add(new TextBlock { Text = "Erkennungstoleranz", FontSize = 13, Foreground = Appearance.Ink,
+        var tolerance = new StackPanel { Spacing = 0, Margin = new(0, 4, 0, 0) };
+        tolerance.Children.Add(new TextBlock { Text = "Erkennungstoleranz", FontSize = 13, Foreground = Appearance.Ink,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        heading.Children.Add(new TextBlock { Text = "Gering ↔ Hoch", FontSize = 11, Foreground = Appearance.Muted,
-            VerticalAlignment = VerticalAlignment.Center });
-        tolerance.Children.Add(heading);
         panel.Children.Add(tolerance);
         Sensitivity(tolerance, "Schwimmer", "BobberSensitivity", options.BobberSensitivity,
             value => options.BobberSensitivity = value, changed);
         Sensitivity(tolerance, "Spritzer", "SplashSensitivity", options.SplashSensitivity,
             value => options.SplashSensitivity = value, changed);
+        var direction = new Grid();
+        direction.Children.Add(new TextBlock { Text = "Gering", FontSize = 11, Foreground = Appearance.Muted,
+            HorizontalAlignment = HorizontalAlignment.Left });
+        direction.Children.Add(new TextBlock { Text = "Hoch", FontSize = 11, Foreground = Appearance.Muted,
+            HorizontalAlignment = HorizontalAlignment.Right });
+        tolerance.Children.Add(direction);
     }
 
     private static Grid Row(StackPanel panel, string label)

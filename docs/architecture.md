@@ -36,6 +36,16 @@ Die Mindestbewertung beurteilt Farbähnlichkeit, Geometrie und Pixelmenge. Zusä
 
 Die Fensterdateien liegen gemeinsam unter `Views/MainWindow/`. Lebensdauer und Status, Sitzung, Bereichseinstellungen, Darstellung, Platzierung, Speicherung, Fortschritt und Überwachung sind nach Zuständigkeit getrennt. `Appearance` hält wiederverwendete Farben und Brushes. Die Fortschrittsanzeige erstellt im Leerlauf keine fortlaufenden Texte oder Brushes. Die feste helle Darstellung benötigt keine Theme-Umschaltung. Tooltips werden nicht angelegt; Framework-Tooltips sind unterdrückt.
 
+## Updates
+
+`Services/Updates/GitHubUpdates` fragt ausschließlich auf Benutzerwunsch das neueste reguläre Release aus `leafcreek/Fish` ab (zehn Sekunden Zeitlimit). Versionsangaben werden numerisch verglichen; ältere Versionen und Vorabversionen werden nicht installiert. Das öffentliche Repository benötigt keine Zugangsdaten im Programm. Parallele Prüfungen werden durch den gesperrten Versionsbutton verhindert.
+
+Downloads werden gestreamt, auf die angekündigte Größe begrenzt und mit SHA-256 geprüft. Die Prüfsumme stammt aus dem GitHub-Asset-Digest oder ersatzweise `SHA256SUMS.txt`. Abbruch und Fehler lassen die laufende EXE unangetastet. Bei fehlenden Schreibrechten führt der manuelle Download zum Release.
+
+`UpdateInstaller` kopiert die aktuelle Einzeldatei als Hilfsprozess in einen eigenen Cache-Auftrag. Der eigene Programmeinstieg verarbeitet `--apply-update` vor WinUI und öffnet dabei keine Fenster oder Overlays. Eine Bereitschaftsbestätigung muss vorliegen, bevor die Angelsitzung beendet wird. Erst erfolgreiches Speichern und Schließen geben den Austausch frei. PID, Prozessstartzeit und EXE-Pfad identifizieren die Elterninstanz; die Original-Prüfsumme verhindert das Überschreiben einer zwischenzeitlich ausgetauschten Datei.
+
+Die geprüfte neue Datei wird auf das Zielvolume kopiert und dort über `File.Replace` mit Sicherung ausgetauscht. Der Neustart übernimmt den tatsächlichen Einstellungsordner. Das neue Hauptfenster bestätigt seinen Start; ohne Bestätigung innerhalb von 30 Sekunden beendet der Helfer ausschließlich seinen neu gestarteten Prozess und stellt die Sicherung wieder her. Nach zwei Tagen räumt ein späterer Programmstart bekannte Cache-Dateien veralteter Aufträge auf. Die EXE-Sicherung bleibt neben dem Programm.
+
 ## Windows-Anbindung
 
 `GameWindow` liest Identität, Sichtbarkeit und Client-Geometrie. `BotDesktop` verbindet diese Prüfungen mit Aufnahme und Eingaben. `ScreenCapture` verwendet einen wiederverwendeten Windows-DIB und DC; zurückgegebene Bilder besitzen eigene verwaltete Pixel. Eingaben gehen nur an das weiterhin passende Fenster. `KeyboardInput` sendet zusammengehörige Tastenkombinationen mit Freigaben, und der vorherige Fokus wird nach einer Aktion wiederhergestellt.

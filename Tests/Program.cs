@@ -5,6 +5,12 @@ void Check(bool value, string message)
     passed++; Console.WriteLine("PASS " + message);
 }
 string folder = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "tests", Guid.NewGuid().ToString("N"));
+if (args.Contains("--updates-only"))
+{
+    await UpdateTests.Run(Check, folder);
+    Console.WriteLine($"{passed} Update-Prüfungen erfolgreich.");
+    return;
+}
 int packageIndex = Array.IndexOf(args, "--verify-runtime-assembly");
 if (packageIndex >= 0)
 {

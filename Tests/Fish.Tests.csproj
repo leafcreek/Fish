@@ -22,5 +22,6 @@
     <Compile Include="../Configuration/*.cs" Link="Configuration/%(Filename)%(Extension)" />
     <Compile Include="../Native/*.cs" Link="Native/%(Filename)%(Extension)" />
     <Compile Include="../Services/BotDesktop.cs" Link="Services/BotDesktop.cs" />
+    <Compile Include="../Services/Updates/*.cs" Link="Services/Updates/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

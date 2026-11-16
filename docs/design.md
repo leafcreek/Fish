@@ -4,10 +4,11 @@ Fish bleibt ein kleines Hilfsfenster: feste Breite von 480 Pixeln, kompakte Höh
 
 ## Gestaltung
 
-- Mica als Fensterhintergrund, helle Inhaltsflächen und ein gemeinsamer Radius von 12 px. Die native Titelleiste mit Fischsymbol und Windows-Fenstersteuerung bleibt erhalten.
+- Mica als Fensterhintergrund, helle Inhaltsflächen und ein gemeinsamer Radius von 12 px. Eine eigene kompakte WinUI-Titelleiste mit Goldfischsymbol greift die Petrol-/Mintfarben auf. Ziehen, Fenstersteuerung und Taskleistensymbol bleiben über Windows bedienbar.
+- Eine schmale, farblich passende Statusleiste zeigt rechts ausschließlich die tatsächliche Build-Version ohne Commit-Zusatz. Die bisherigen äußeren Fenstergrößen bleiben erhalten.
 - Petrol für Schwimmer und Suche, Gold für Spritzer und Warten, Grün für Start und Erfolg, Rot für Stop und Zeitablauf. Die Suchrahmen greifen die gleichen Farbfamilien auf.
 - Die Statusfläche hat einen zurückhaltenden Mintverlauf und ein kleines Wellenmotiv. Zustand, Aktion und Zeit sind direkt ablesbar. Keine zusätzlichen Kennzahlen oder Erklärtexte.
-- Native WinUI-Regler behalten Maus-, Tastatur- und Fokusverhalten bei kompakter Höhe von 26 px. Gering ↔ Hoch steht einmal neben Erkennungstoleranz; die Regler heißen Schwimmer und Spritzer.
+- Native WinUI-Regler behalten Maus-, Tastatur- und Fokusverhalten bei kompakter Höhe von 26 px. Gering und Hoch stehen einmal unterhalb des Spritzer-Reglers links und rechts für beide Regler; die Regler heißen Schwimmer und Spritzer.
 - Neue Statusmeldungen blenden in 167 ms ein; ein erfolgreicher Fund erhält einen 250-ms-Impuls. Die bestehende Ergebnisanzeige bleibt 600 ms sichtbar. Die Windows-Einstellung für reduzierte Bewegung wird berücksichtigt. Keine neuen laufenden Dekorationsanimationen oder Animationstimer.
 - Überwachung: Schwimmer und Spritzer nebeneinander, Live darunter über die gesamte Breite. Bilder nutzen den verfügbaren Platz; leere Bilder zeigen nur ein dezentes Symbol.
 - Suchrahmen sind leicht transparent mit geraden, durchgehend 2 Pixel starken Kanten. So passen Innen- und Außenkontur exakt zusammen. Nur die Griffpunkte sind abgerundet und tragen ✥ und ◢. Der Innenbereich bleibt frei von Rahmenpixeln; Spritzer bleiben unveränderlich und durchklickbar.

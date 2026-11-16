@@ -19,6 +19,8 @@ Fish aktiviert WoW für Eingaben kurz und versucht danach den vorherigen Fenster
 ## Bedienung
 
 - **Status:** Zeigt den aktuellen Schritt und dessen Zeit. Ein Fund leuchtet kurz grün, ein abgelaufener Suchschritt rot.
+- **Fensterleisten:** Die eigene Titelleiste zeigt das Goldfischsymbol und lässt sich zum Verschieben ziehen. Die schmale Statusleiste unten zeigt die Version des laufenden Builds.
+- **Updates:** Ein Klick auf die Versionsnummer prüft GitHub auf eine neuere Version. Mit **Aktualisieren** wird sie heruntergeladen und geprüft; anschließend beendet Fish das Angeln, speichert die Einstellungen und startet neu. **Später** lässt alles weiterlaufen. Die Prüfung benötigt keine Anmeldung.
 - **Erkennungstoleranz:** Zwei Regler für **Schwimmer** und **Spritzer**. Links ist die Erkennung strenger, rechts toleranter. Änderungen sind auch während einer Sitzung möglich.
 - **Überwachung:** Startet eingeklappt. Aufklappen zeigt Schwimmer und Spritzer nebeneinander sowie ein größeres Livebild darunter. Dabei ändert sich ausschließlich die Fensterhöhe. Breite und die beiden Zielhöhen bleiben fest, auch nach wiederholtem Umschalten.
 - **Suchrahmen:** Petrol markiert den Schwimmerbereich, Gold den Spritzerbereich. Der Spritzerrahmen erscheint erst nach einem Fund, bleibt 50 × 50 Pixel groß und ist durchklickbar.
@@ -70,6 +72,16 @@ dotnet publish Fish.csproj -c Release -p:PublishProfile=win-x64
 ```
 
 Die eigenständig lauffähige Einzeldatei entsteht unter `publish/Fish.exe`. Benutzereinstellungen gehören nicht in den Release-Download.
+
+Releases verwenden übereinstimmende Versionen in `Fish.csproj` und GitHub-Tag (`v1.2.0`) sowie die Assets `Fish.exe` und `SHA256SUMS.txt`. Erst nach vollständigem Upload wird das Release veröffentlicht und als neuestes reguläres Release markiert. Eine veröffentlichte Version wird nicht nachträglich mit einem anderen Build überschrieben.
+
+Beim Update bleibt die vorherige EXE als `<Name>.exe.bak` neben dem Programm erhalten. Kann die neue Version nicht starten, wird die Sicherung automatisch wiederhergestellt. Fehlen Schreibrechte, bietet Fish den manuellen Download an. Einstellungen bleiben an ihrem bisherigen Speicherort, auch mit `--settings-directory`. Temporäre Downloads liegen unter `%LOCALAPPDATA%\Fish\Updates`; über zwei Tage alte Aufträge werden beim nächsten Start aufgeräumt. Die SHA-256-Prüfung erkennt beschädigte Downloads; sie ist keine unabhängige Herausgebersignatur.
+
+Gezielte Prüfung der Update-Logik:
+
+```powershell
+dotnet run --project Tests/Fish.Tests.csproj -c Release -- --updates-only
+```
 
 Die Fensterprüfungen laufen separat am veröffentlichten Build:
 

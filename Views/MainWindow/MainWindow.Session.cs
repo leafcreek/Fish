@@ -12,7 +12,7 @@ public sealed partial class MainWindow
     {
         _running = running;
         ResetStepProgress();
-        SessionButton.IsEnabled = !_closing;
+        SessionButton.IsEnabled = !_closing && !_installingUpdate;
         SetSessionAction(running ? "Stoppen" : "Starten", running);
         RefreshSessionAppearance();
     }
@@ -33,7 +33,7 @@ public sealed partial class MainWindow
 
     private async Task StartAsync()
     {
-        if (_closing || _running || _session is { IsCompleted: false }) return;
+        if (_closing || _installingUpdate || _running || _session is { IsCompleted: false }) return;
         _options.Normalize();
         MessageBar.IsOpen = false;
         _previews = new();
