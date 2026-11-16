@@ -21,8 +21,8 @@ public static class FishSessionFixture {
 [FishSessionFixture]::CheckEmptyRegion()
 $settings = Join-Path (Split-Path $PSScriptRoot -Parent) ('artifacts\ui-tests\session-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $settings -Force | Out-Null
-@{ SchemaVersion = 6; BobberAreaWidth = 100; BobberAreaHeight = 100; BobberAreaXOffset = 7680; BobberAreaYOffset = 4320 } |
-    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $settings 'appsettings.json') -Encoding UTF8
+@{ SchemaVersion = 7; BobberAreaWidth = 100; BobberAreaHeight = 100; BobberAreaXOffset = 7680; BobberAreaYOffset = 4320 } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $settings 'settings.json') -Encoding UTF8
 $app = Start-Process -FilePath (Resolve-Path -LiteralPath $Executable).Path -ArgumentList "--settings-directory `"$settings`"" -WindowStyle Hidden -PassThru
 try {
     $root = Wait-FishWindow $app

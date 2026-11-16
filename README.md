@@ -1,67 +1,94 @@
 # Fish
 
-Kompakter WinUI-3-Angelbot für World of Warcraft auf .NET 10. Die Erkennung arbeitet mit sichtbaren Bildschirmaufnahmen, ohne Addon oder Statuspixel.
+Kompakter Angelbot für World of Warcraft unter Windows. Fish erkennt Schwimmer und Bisse anhand von Bildschirmaufnahmen und wirft automatisch erneut aus. Die Erkennung benötigt kein Addon und keine WeakAura.
 
-## Benutzung
+**[Fish.exe herunterladen](https://github.com/leafcreek/Fish/releases/latest/download/Fish.exe)** · [Alle Releases](https://github.com/leafcreek/Fish/releases) · [Technische Dokumentation](docs/architecture.md)
 
-Die aktuelle Einzeldatei liegt unter **`publish/Fish.exe`**. WoW muss sichtbar sein. Den **Angeln-Hotkey** passend zur Spielbelegung eingeben oder mit **Setzen** aufnehmen. Standard ist `1`; Kombinationen wie `Ctrl+F8` sind möglich. Escape bricht die Aufnahme ab.
+![Fish mit eingeklappter Überwachung](docs/images/fish.png)
 
-Der Button in der Statuskarte wechselt zwischen **Starten** und **Stoppen**. Ein neuer Start beginnt mit einem frischen Wurf. Nach dem Auswerfen wartet Fish zwei Sekunden und sucht anschließend bis zu fünf Sekunden nach dem Schwimmer. Nach dessen Fund erkennt der Vergleich aufeinanderfolgender Bilder einen Spritzer und löst den Loot-Klick aus. Die maximale Wurfdauer beträgt 25 Sekunden ab Wurf; nach einem Klick wartet Fish eine Sekunde. Ausführlich: [Angelablauf](docs/fishing-cycle.md).
+## Loslegen
 
-Die Fortschrittsleiste zeigt Anwurf, Schwimmer-Suche, Spritzer-Beobachtung und Loot-Wartezeit getrennt. Treffer leuchten kurz grün, Timeouts rot.
+1. Die aktuelle **Fish.exe** aus den Releases herunterladen und starten. Die Laufzeiten für .NET und Windows App SDK sind enthalten; ein Installer ist nicht erforderlich.
+2. WoW öffnen und das Spielfenster sichtbar lassen. Die veröffentlichte EXE ist für **Windows x64**; für die vollständige Darstellung wird Windows 11 empfohlen.
+3. Die **Angeltaste** passend zur Spielbelegung einstellen. Standard ist `1`; über **Setzen** lassen sich auch Kombinationen wie `Strg+F8` aufnehmen. `Esc` bricht die Aufnahme ab.
+4. Den Schwimmer-Suchbereich mit **✥** verschieben oder mit **◢** vergrößern. Er startet bei 600 × 300 Pixeln ohne Versatz. `Esc` verwirft eine laufende Änderung.
+5. **Starten** drücken. Derselbe Button beendet die Sitzung über **Stoppen**.
 
-Zum Auswerfen und Looten aktiviert Fish kurz das Spielfenster und stellt den vorherigen Fokus anschließend wieder her. Ein gedrückter Modifier oder eine gehaltene Angeltaste verschiebt den nächsten Wurf. Fenster und Suchbereich werden vor Eingaben sowie nach Scans erneut geprüft.
+Fish aktiviert WoW für Eingaben kurz und versucht danach den vorherigen Fensterfokus wiederherzustellen. Minimiertes WoW unterbricht die Erkennung. Beim Minimieren von Fish verschwinden auch die Suchrahmen.
 
-## Erkennungstoleranz
+## Bedienung
 
-Die zwei Slider füllen die verfügbare Breite. Links steht **Gering**, mittig **Schwimmer** beziehungsweise **Spritzer**, rechts **Hoch**. Die interne Skala reicht von 0 bis 100; Zahlenfelder und Tooltips gibt es nicht.
+- **Status:** Zeigt den aktuellen Schritt und dessen Zeit. Ein Fund leuchtet kurz grün, ein abgelaufener Suchschritt rot.
+- **Erkennungstoleranz:** Zwei Regler für **Schwimmer** und **Spritzer**. Links ist die Erkennung strenger, rechts toleranter. Änderungen sind auch während einer Sitzung möglich.
+- **Überwachung:** Startet eingeklappt. Aufklappen zeigt Schwimmer und Spritzer nebeneinander sowie ein größeres Livebild darunter. Dabei ändert sich ausschließlich die Fensterhöhe. Breite und die beiden Zielhöhen bleiben fest, auch nach wiederholtem Umschalten.
+- **Suchrahmen:** Petrol markiert den Schwimmerbereich, Gold den Spritzerbereich. Der Spritzerrahmen erscheint erst nach einem Fund, bleibt 50 × 50 Pixel groß und ist durchklickbar.
 
-| Slider | Gering: 0 | Mitte: 50 | Hoch: 100 |
-| --- | --- | --- | --- |
-| Schwimmer: Mindestbewertung / Farbtoleranz | 95 % / 0 | 50 % / 50 | 1 % / 90 |
-| Spritzer: Pixel-Rauschtoleranz / Mindeständerung | 100 / 25 % | 50 / 10 % | 10 / 1 % |
+Das Fenster bleibt im Vordergrund und verwendet eine helle Oberfläche. Die kompakte Größe beträgt 480 × 400 Pixel bei 100 % Windows-Skalierung. Mit geöffneter Überwachung steigt die Höhe auf bis zu 820 Pixel, begrenzt durch die verfügbare Arbeitsfläche. Manuelles Vergrößern und Maximieren sind gesperrt.
 
-Diese Eckpunkte gelten für neue Einstellungen. Ältere Einzelwerte bleiben als Referenz bei Reglerstellung 50 erhalten. Die weichen Kurven werden immer aus dieser gespeicherten Referenz berechnet; wiederholtes Verstellen oder Neustarten verstärkt die Werte nicht erneut. Höhere Toleranz kann mehr Fehlertreffer bedeuten.
+## Erkennung und Ablauf
 
-Die [Schwimmer-Erkennung](Assets/Detection/README.md) verlangt mindestens zwei räumlich passende Merkmale aus blauer Feder, roter Feder, Körper und Metallöse. Genau zwei Merkmale benötigen drei frische Aufnahmen zur Bestätigung, ab drei Merkmalen wird ein Treffer sofort akzeptiert. Die [Spritzer-Erkennung](docs/splash-motion.md) berücksichtigt normale Wasserbewegung, zusammenhängende Änderungen und großflächige Bildwechsel. Live-Änderungen gelten während der Sitzung; eine veränderte Schwimmer-Abstimmung verwirft alte Fundpunkte, eine veränderte Spritzer-Abstimmung kalibriert neu.
+Nach dem Auswerfen wartet Fish zwei Sekunden auf das Aufsetzen des Schwimmers. Anschließend stehen volle fünf Sekunden für die Schwimmersuche zur Verfügung. Ein Fund wechselt zur Spritzererkennung; ein Biss löst den Rechtsklick zum Einholen aus. Nach einer Sekunde Wartezeit beginnt der nächste Wurf. Ohne Fund oder Biss wird spätestens nach insgesamt 25 Sekunden neu ausgeworfen.
 
-Das Schwimmer-Profil ist vollständig in `Assets/Detection/bobber.json` gespeichert. **Die Anwendung benötigt kein Schwimmer-PNG und berechnet kein Template beim Start.** Die ursprüngliche PNG liegt ausschließlich als Regressionstest-Vorlage unter `Tests/Fixtures/bobber-reference.png`.
+Die Schwimmersuche prüft mindestens zwei räumlich passende Merkmale aus blauer Feder, roter Feder, Körper und Metallöse. Treffer aus genau zwei Merkmalen benötigen drei aufeinanderfolgende Bestätigungen. Die Spritzererkennung vergleicht aufeinanderfolgende Bilder und berücksichtigt normale Wasserbewegung. Eine höhere Toleranz kann zusätzliche Fehlertreffer zulassen.
 
-## Bereiche und Überwachung
+Das Farbprofil ist in die EXE eingebettet. Es wird kein zusätzliches Schwimmerbild benötigt. Die tatsächliche Erkennungsqualität und das erfolgreiche Einholen müssen im jeweiligen Zielclient beurteilt werden.
 
-Der Schwimmer-Bereich startet bei 600 × 300 Pixeln ohne Versatz. Seine Mausgriffe verschieben und skalieren ihn; Escape verwirft die Geste. Während der Bearbeitung ruhen Aufnahme und Eingaben. Nach dem Loslassen wird mit frischer Referenz gesucht. Die Gesamtwurfdauer läuft weiter.
+Details: [Angelablauf](docs/fishing-cycle.md) · [Schwimmerprofil](Assets/Detection/README.md) · [Spritzererkennung](docs/splash-motion.md)
 
-Der Spritzer-Bereich bleibt fest 50 × 50 Pixel mittig am erkannten Schwimmer und besitzt keine Mausgriffe. Er ist erst nach einem bestätigten Schwimmer-Fund sichtbar. Minimiertes Fish blendet beide Rahmen und die Griffe aus. Minimiertes WoW unterbricht Aufnahme und Eingaben.
+## Einstellungen
 
-Die aufklappbare **Überwachung** zeigt Schwimmer und Spritzer nebeneinander, darunter Live über die volle Breite. Die Bilder füllen ihre Flächen ohne festes Seitenverhältnis und passen sich Fensterbreite und -höhe an. Es gibt nur Überschriften. Fundbilder bleiben bis zum nächsten Start erhalten; Livebilder werden auf höchstens fünf pro Sekunde begrenzt und bei verborgener Überwachung nicht aufbereitet. Kleine Fenster bleiben per Mausrad bedienbar; Scrollleisten sind ausgeblendet.
+Fish speichert automatisch unter:
 
-Fish verwendet eine feste helle Darstellung, bleibt im Vordergrund und hat kein Tray-Symbol, Protokoll, Statistikmodul oder Update-System. Schließen beendet die Anwendung. Fehlermeldungen erscheinen direkt im Fenster.
+```text
+%LOCALAPPDATA%\Fish\settings.json
+```
 
-## Einstellungen und Projektaufbau
+Gespeichert werden nur Angeltaste, beide Toleranzregler, Schwimmerbereich und Fensterposition sowie die Formatversion. Feste Zeiten, Fenstermaße, DPI und frühere Einzelregler werden nicht mehr gespeichert.
 
-`appsettings.json` liegt neben der EXE. Änderungen werden nach 400 ms Eingabepause und beim Schließen atomar gespeichert, mit `.bak`-Sicherung. Nicht lesbare oder neuere Konfigurationen werden nicht überschrieben. Zeiten, Spritzer-Geometrie und Wasseranpassung stammen ausschließlich aus `FishingDefaults`.
+- Eine vorhandene `appsettings.json` neben der EXE wird einmalig übernommen, wenn am neuen Speicherort weder Hauptdatei noch Sicherung existiert. Die alten Dateien bleiben unverändert.
+- Frühere individuelle Einzelwerte werden auf die nächstpassende heutige Reglerstellung übertragen. Bei den Standard-Basiswerten bleiben die Stellungen unverändert.
+- Änderungen werden nach 400 ms Eingabepause und beim Schließen gespeichert. Die vorherige gültige Datei bleibt als `settings.json.bak` erhalten.
+- Bei beschädigter Hauptdatei wird eine gültige Sicherung wiederhergestellt und das beschädigte Original separat aufgehoben. Neuere, nicht unterstützte Formate werden nicht überschrieben.
+- Mehrere Fish-Kopien desselben Windows-Benutzers teilen standardmäßig ihre Einstellungen. Gleichzeitige Speicherzugriffe innerhalb einer Windows-Sitzung werden serialisiert; der zuletzt gespeicherte Stand gewinnt.
 
-- `Core/`: Erkennung, Angelablauf, Fortschritt und Vorschaupuffer.
-- `Configuration/`: gespeicherte Werte, Toleranzkurven und unveränderliche Laufzeitoptionen.
-- `Native/` und `Services/`: Fenster, Aufnahme, Eingaben und Rahmen.
-- `Views/MainWindow/`: Fensterlayout, Lebensdauer, Darstellung und Speicherung.
-- `Views/`: Hotkey-Editor, Regler und Überwachungsansicht.
-- `Assets/`: Goldfisch-Icon und eingefrorenes Erkennungsprofil.
-- `Tests/`: Simulationen, Bildregressionen und Desktop-/UI-Prüfungen.
-- `publish/`: eine aktuelle ausführbare Version samt Benutzereinstellungen.
-- `artifacts/`: Prüfberichte und isolierte Testausgaben; keine Release-Sammlung.
-
-Die [Architektur](docs/architecture.md) beschreibt die Zuständigkeiten. Die früher angeforderte PDF bleibt als historisches Dokument unter `docs/archive/` erhalten; maßgeblich sind die aktuellen Markdown-Dokumente.
-
-## Bauen und prüfen
+Für einen eigenen oder portablen Speicherordner:
 
 ```powershell
-dotnet build Fish.csproj
-dotnet run --project Tests/Fish.Tests.csproj
+.\Fish.exe --settings-directory "D:\Fish-Portable"
+```
+
+Auch dort heißt die Datei `settings.json`. Eine alte `appsettings.json` wird in diesem Modus ausschließlich aus dem gewählten Ordner übernommen.
+
+## Selbst bauen
+
+Benötigt werden Windows und das **.NET 10 SDK**.
+
+```powershell
+dotnet restore Fish.csproj -r win-x64
+dotnet run --project Tests/Fish.Tests.csproj -c Release
 dotnet publish Fish.csproj -c Release -p:PublishProfile=win-x64
+```
+
+Die eigenständig lauffähige Einzeldatei entsteht unter `publish/Fish.exe`. Benutzereinstellungen gehören nicht in den Release-Download.
+
+Die Fensterprüfungen laufen separat am veröffentlichten Build:
+
+```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File Tests/CompactUiSmoke.ps1 -Executable publish/Fish.exe
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File Tests/Smoke-Ui.ps1 -Executable publish/Fish.exe -NoSession -NativeOverlay
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File Tests/SessionUiSmoke.ps1 -Executable publish/Fish.exe
 ```
 
-`--desktop-smoke` ergänzt native Aufnahme- und Ressourcenprüfungen; `--overlay-only` prüft die Griffe ausschließlich an einem eigenen Testfenster. UI-Tests verwenden isolierte Einstellungen unter `artifacts/ui-tests/`. Der Sitzungstest verwendet einen garantiert außerhalb des Spielfensters liegenden Bereich und sendet keine Spieleingaben. Reale Erkennungsqualität und Loot-Erfolg müssen weiterhin im Zielclient beurteilt werden.
+Die Tests verwenden eigene Fenster und isolierte Einstellungen. Der Sitzungstest verhindert Spieleingaben durch einen außerhalb von WoW liegenden Suchbereich. `DefaultSettingsUiSmoke.ps1` prüft ausdrücklich den echten Benutzerspeicher und dessen Migration; dieser Test gehört nicht zu den isolierten Standardprüfungen.
+
+## Projekt
+
+[Architektur](docs/architecture.md) · [Gestaltung](docs/design.md) · [Historische Dokumente](docs/archive/README.md)
+
+- `Core/`: Erkennung, Angelablauf, Fortschritt und Vorschaupuffer.
+- `Configuration/`: Benutzereinstellungen, Migration, feste Vorgaben und Toleranzkurven.
+- `Native/`, `Services/`: Windows-Fenster, Bildschirmaufnahme, Eingaben und Suchrahmen.
+- `Views/`, `ViewModels/`: Oberfläche und deren Zustand.
+- `Assets/`: Goldfischsymbol und eingebettetes Farbprofil.
+- `Tests/`: Simulationen, Bildregressionen und Fensterprüfungen.
+- `publish/`, `artifacts/`: lokale Builds und Prüfergebnisse; nicht Teil des Repositorys.

@@ -9,5 +9,7 @@ public static class FishingDefaults
     public const int LootDelayMilliseconds = 1000;
     public const int ScanIntervalMilliseconds = 100;
     public const int SplashCalibrationMilliseconds = 1000;
+    public const int BobberMinimumRating = 50, BobberColorTolerance = 50;
+    public const int SplashPixelTolerance = 50, SplashChangePercent = 10;
     public static SearchRegion SplashRegion => new(50, 50, 0, 0);
 }

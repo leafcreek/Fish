@@ -341,14 +341,14 @@ static class BotEngineTests
 
         await Exercise("Live-Schwelle", s =>
         {
-            s.Options.BobberMatchMinimum = 99;
+            s.Options.BobberSensitivity = 0;
             bool posted = false;
             s.Desktop.OnCapture = area =>
             {
                 if (posted || area.Width != 160) return;
-                posted = true; s.Options.BobberMatchMinimum = 80;
+                posted = true; s.Options.BobberSensitivity = 20;
                 s.Engine.UpdateOptions(s.Options);
-                s.Options.BobberMatchMinimum = 99; // Must not mutate the already published snapshot.
+                s.Options.BobberSensitivity = 0; // Must not mutate the already published snapshot.
             };
             s.Desktop.OnLoot = s.Cancel;
             s.Desktop.OnKey = _ => { if (s.Desktop.Keys.Count == 2) s.Cancel(); };
@@ -377,7 +377,7 @@ static class BotEngineTests
         public readonly BotEngine Engine;
         // Fixed geometry; the synthetic splash starts after the fixed one-second calibration.
         public readonly BotOptions Options = new() { BobberAreaWidth = 160, BobberAreaHeight = 140,
-            BobberMatchMinimum = 80, BobberColorTolerance = 0, BobberAreaYOffset = 30, SplashPixelTolerance = 20, SplashChangePercent = 5 };
+            BobberSensitivity = 20, BobberAreaYOffset = 30, SplashSensitivity = 80 };
         private IEnumerable<StepCompletion> Completions => Updates.Select(u => u.CompletedStep).OfType<StepCompletion>().DistinctBy(c => c.Id);
         public int BobberFinds => Completions.Count(c => c.Success && c.Progress.State == BotState.SearchingBobber);
         public int BobberTimeouts => Completions.Count(c => !c.Success && c.Progress.State == BotState.SearchingBobber && c.CompletedAt < c.Progress.StartedAt.AddSeconds(25));

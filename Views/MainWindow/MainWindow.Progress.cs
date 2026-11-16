@@ -22,6 +22,7 @@ public sealed partial class MainWindow
             _lastStepCompletion = completion.Id;
             _stepFlash = completion;
             _stepFlashUntil = DateTimeOffset.UtcNow.AddMilliseconds(600);
+            if (completion.Success) AnimateCompletion();
         }
         RefreshStepProgress();
     }
@@ -43,23 +44,28 @@ public sealed partial class MainWindow
         _progressIdle = idle;
         double maximum = progress?.MaximumSeconds ?? 0;
         double elapsed = progress?.ElapsedSeconds(_stepFlash?.CompletedAt ?? now) ?? 0;
-        string label = progress?.State.Label() ?? "Kein aktiver Schritt";
+        string label = progress?.State switch
+        {
+            BotState.Casting => "Aufsetzen", BotState.SearchingBobber => "Suche",
+            BotState.Fishing => "Warten", BotState.Looting => "Nächster Wurf", _ => "Startklar"
+        };
         if (_stepFlash is { } flash)
             label = (flash.Progress.State, flash.Success) switch
             {
                 (BotState.SearchingBobber, true) => "Schwimmer gefunden",
-                (BotState.SearchingBobber, false) => "Schwimmer nicht gefunden",
+                (BotState.SearchingBobber, false) => "Kein Schwimmer gefunden",
                 (BotState.Casting, false) => "Wurfzeit abgelaufen",
-                (_, true) => "Spritzer erkannt",
-                _ => "Kein Spritzer erkannt"
+                (_, true) => "Biss erkannt",
+                _ => "Kein Biss"
             };
-        StepTimeText.Text = $"{label} · {elapsed:F1} / {maximum:F1} s";
+        StepCaption.Text = label;
+        StepTimeText.Text = $"{elapsed:F1} / {maximum:F1} s";
         StepTimeProgress.Maximum = Math.Max(.001, maximum);
         StepTimeProgress.Value = _stepFlash != null ? StepTimeProgress.Maximum : elapsed;
         StepTimeProgress.Foreground = _stepFlash is { } result
             ? result.Success ? Appearance.Running : Appearance.Stopped : Appearance.Detection;
         StepProgressPanel.Background = _stepFlash is { } flashResult
             ? flashResult.Success ? Appearance.SuccessFlash : Appearance.TimeoutFlash : Appearance.Transparent;
-        AutomationProperties.SetHelpText(StepTimeProgress, StepTimeText.Text);
+        AutomationProperties.SetHelpText(StepTimeProgress, $"{label} · {StepTimeText.Text}");
     }
 }

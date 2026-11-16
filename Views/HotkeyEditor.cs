@@ -23,10 +23,12 @@ internal sealed class HotkeyEditor : StackPanel
         var row = new Grid { ColumnSpacing = 5 };
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        _text = new TextBox { Text = value, MinHeight = 28, FontSize = 12, Padding = new(6, 3, 6, 3), PlaceholderText = "Ctrl+F8" };
+        _text = new TextBox { Text = value, MinHeight = 28, FontSize = 12, Padding = new(8, 3, 8, 3),
+            CornerRadius = new(6), TextAlignment = TextAlignment.Center, Foreground = Appearance.Ink, PlaceholderText = "Strg+F8" };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_text, "Angeln-Hotkey");
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_text, "FishingHotkey");
-        _capture = new Button { Content = "Setzen", MinWidth = 0, MinHeight = 28, FontSize = 12, Padding = new(7, 3, 7, 3) };
+        _capture = new Button { Content = "Setzen", MinWidth = 0, MinHeight = 28, FontSize = 12,
+            Padding = new(9, 3, 9, 3), CornerRadius = new(6), Foreground = Appearance.Detection };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_capture, "Angeln-Tastenkombination setzen");
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_capture, "CaptureFishingHotkey");
         _hint = new TextBlock { Text = "Taste oder Kombination mit Strg, Alt und Umschalt.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
@@ -38,7 +40,7 @@ internal sealed class HotkeyEditor : StackPanel
                 _hint.Text = $"{hotkey.DisplayName} · mit Eingabe oder Fokuswechsel übernehmen.";
                 _hint.Visibility = Visibility.Collapsed;
             }
-            else { _hint.Text = "Ungültige Kombination. Die bisherige Belegung bleibt aktiv."; _hint.Visibility = Visibility.Visible; }
+            else { _hint.Text = "Ungültige Taste. Bisherige Belegung bleibt."; _hint.Visibility = Visibility.Visible; }
         };
         _text.LostFocus += (_, _) => Commit();
         _text.KeyDown += (_, e) =>
@@ -49,7 +51,7 @@ internal sealed class HotkeyEditor : StackPanel
         _capture.Click += (_, _) =>
         {
             _recording = true; _capture.Content = "Taste drücken …";
-            _hint.Text = "Gewünschte Kombination drücken. Escape bricht die Aufnahme ab.";
+            _hint.Text = "Taste drücken. Esc bricht ab.";
             _hint.Visibility = Visibility.Visible;
             _capture.Focus(FocusState.Programmatic);
         };
@@ -80,6 +82,6 @@ internal sealed class HotkeyEditor : StackPanel
         bool valid = FishingHotkey.TryParse(_text.Text, out var hotkey);
         _hint.Visibility = valid ? Visibility.Collapsed : Visibility.Visible;
         _hint.Text = valid ?
-            $"Angeln: {hotkey.DisplayName} · gilt ab dem nächsten Wurf." : "Ungültige Kombination. Die bisherige Belegung bleibt aktiv.";
+            $"Angeln: {hotkey.DisplayName} · gilt ab dem nächsten Wurf." : "Ungültige Taste. Bisherige Belegung bleibt.";
     }
 }

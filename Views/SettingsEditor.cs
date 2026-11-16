@@ -10,12 +10,17 @@ internal sealed class SettingsEditor
     public SettingsEditor(StackPanel panel, BotOptions options, Action changed)
     {
         panel.Children.Clear();
-        var hotkey = Row(panel, "Angeln-Hotkey");
-        var editor = new HotkeyEditor(options.FishingHotkey, value => { options.FishingHotkey = value; changed(); }) { Width = 210 };
+        var hotkey = Row(panel, "Angeltaste");
+        var editor = new HotkeyEditor(options.FishingHotkey, value => { options.FishingHotkey = value; changed(); }) { Width = 145 };
         Grid.SetColumn(editor, 1); hotkey.Children.Add(editor);
 
-        var tolerance = new StackPanel { Spacing = 4, Margin = new(0, 4, 0, 0) };
-        tolerance.Children.Add(new TextBlock { Text = "Erkennungstoleranz", FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var tolerance = new StackPanel { Spacing = 2, Margin = new(0, 4, 0, 0) };
+        var heading = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        heading.Children.Add(new TextBlock { Text = "Erkennungstoleranz", FontSize = 13, Foreground = Appearance.Ink,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        heading.Children.Add(new TextBlock { Text = "Gering ↔ Hoch", FontSize = 11, Foreground = Appearance.Muted,
+            VerticalAlignment = VerticalAlignment.Center });
+        tolerance.Children.Add(heading);
         panel.Children.Add(tolerance);
         Sensitivity(tolerance, "Schwimmer", "BobberSensitivity", options.BobberSensitivity,
             value => options.BobberSensitivity = value, changed);
@@ -28,7 +33,7 @@ internal sealed class SettingsEditor
         var row = new Grid { ColumnSpacing = 8, MinHeight = 32 };
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        row.Children.Add(new TextBlock { Text = label, FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = Appearance.Muted, VerticalAlignment = VerticalAlignment.Center });
         panel.Children.Add(row);
         return row;
     }
@@ -37,17 +42,20 @@ internal sealed class SettingsEditor
         Action<int> write, Action changed)
     {
         var section = new StackPanel { Spacing = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var header = new Grid();
-        header.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        header.Children.Add(new TextBlock { Text = "Gering", FontSize = 11, Opacity = .75 });
-        var title = new TextBlock { Text = label, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
-        Grid.SetColumn(title, 1); header.Children.Add(title);
-        var high = new TextBlock { Text = "Hoch", FontSize = 11, Opacity = .75, HorizontalAlignment = HorizontalAlignment.Right };
-        Grid.SetColumn(high, 2); header.Children.Add(high);
+        var accent = label == "Schwimmer" ? Appearance.Detection : Appearance.Amber;
+        var title = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, HorizontalAlignment = HorizontalAlignment.Center };
+        title.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 5, Height = 5, Fill = accent, VerticalAlignment = VerticalAlignment.Center });
+        title.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = Appearance.Ink,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         var slider = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1, SmallChange = 1, LargeChange = 10,
-            Value = value, HorizontalAlignment = HorizontalAlignment.Stretch, IsThumbToolTipEnabled = false };
+            Value = value, Height = 26, MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Stretch, IsThumbToolTipEnabled = false };
+        foreach (string state in new[] { "", "PointerOver", "Pressed" })
+        {
+            slider.Resources["SliderThumbBackground" + state] = accent;
+            slider.Resources["SliderTrackValueFill" + state] = accent;
+            slider.Resources["SliderTrackFill" + state] = Appearance.Track;
+        }
+        slider.Resources["SliderHeaderForeground"] = Appearance.Ink;
         AutomationProperties.SetName(slider, label + "-Toleranz");
         AutomationProperties.SetAutomationId(slider, id);
         AutomationProperties.SetHelpText(slider, "Links geringe Toleranz, rechts hohe Toleranz.");
@@ -57,6 +65,6 @@ internal sealed class SettingsEditor
             write(level);
             changed();
         };
-        section.Children.Add(header); section.Children.Add(slider); panel.Children.Add(section);
+        section.Children.Add(title); section.Children.Add(slider); panel.Children.Add(section);
     }
 }

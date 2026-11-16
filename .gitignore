@@ -9,6 +9,10 @@
 *.userosscache
 *.sln.docstates
 artifacts/
+settings.json
+settings.json.bak
+settings.json.corrupt-*
+settings.json.*.tmp
 
 # Build logs
 [Ll]og/
@@ -41,6 +45,7 @@ BundleArtifacts/
 # Publish output
 publish/
 *.pubxml
+!Properties/PublishProfiles/win-x64.pubxml
 PublishScripts/
 
 # Code analysis and tooling

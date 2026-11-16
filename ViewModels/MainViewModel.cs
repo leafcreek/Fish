@@ -5,7 +5,7 @@ namespace Fish.ViewModels;
 
 public sealed class MainViewModel : INotifyPropertyChanged
 {
-    private string _status = "Bereit", _activity = "WoW öffnen und Angeln starten.";
+    private string _status = "Bereit", _activity = "WoW öffnen und starten.";
     public string Status { get => _status; set => Set(ref _status, value); }
     public string Activity { get => _activity; set => Set(ref _activity, value); }
     public event PropertyChangedEventHandler? PropertyChanged;

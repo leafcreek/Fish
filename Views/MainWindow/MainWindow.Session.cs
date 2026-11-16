@@ -89,7 +89,7 @@ public sealed partial class MainWindow
             PreviewPanel.ClearLive();
             _displayed = null;
             _viewModel.Status = "Bereit";
-            _viewModel.Activity = "Gestoppt";
+            _viewModel.Activity = "Mit Starten geht’s weiter.";
             SetRunning(false);
             PersistChanges();
             cancellation.Dispose();
@@ -108,10 +108,12 @@ public sealed partial class MainWindow
 
     private void ApplyUpdate(BotUpdate update)
     {
-        _viewModel.Status = update.State.Label();
-        _viewModel.Activity = update.Activity;
-        UpdateStepProgress(update);
+        bool changed = _displayed?.State != update.State;
         _displayed = update;
+        _viewModel.Status = update.State.Label();
+        _viewModel.Activity = SessionText.Detail(update);
+        UpdateStepProgress(update);
+        if (changed) { RefreshSessionAppearance(); AnimateStatusChange(); }
         if (update.State is not (BotState.SearchingBobber or BotState.Fishing)) { _previews.ClearLive(); PreviewPanel.ClearLive(); }
         UpdateOverlays();
     }

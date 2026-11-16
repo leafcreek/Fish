@@ -54,12 +54,12 @@ public sealed partial class MainWindow : Window
         InitializePersistence();
         InitializeWindowResources();
         InitializeAppearance();
-        Activated += (_, _) => ApplyTopmost();
+        Activated += (_, _) => { ApplyTopmost(); RefreshSessionAppearance(); };
         AppWindow.Closing += OnClosing;
         AppWindow.Changed += (_, args) =>
         {
-            if (args.DidPresenterChange) ApplyTopmost();
-            if (args.DidSizeChange) EnsureWindowVisible();
+            if (args.DidPresenterChange) { ApplyTopmost(); RefreshSessionAppearance(); }
+            if (args.DidSizeChange || args.DidPresenterChange) EnsureWindowVisible();
             if (args.DidPresenterChange || args.DidSizeChange) UpdateOverlays();
             if (args.DidSizeChange || args.DidPositionChange) ScheduleSave();
         };
@@ -115,7 +115,7 @@ public sealed partial class MainWindow : Window
             _closing = false;
             RestoreWindow();
             SetRunning(false);
-            ShowError("Einstellungen konnten nicht neben der EXE gespeichert werden. Fenster erneut schließen, um ohne Speichern zu beenden. " + ex.Message);
+            ShowError("Einstellungen konnten nicht gespeichert werden. Fenster erneut schließen, um ohne Speichern zu beenden. " + ex.Message);
             _saveAllowed = false;
             return;
         }

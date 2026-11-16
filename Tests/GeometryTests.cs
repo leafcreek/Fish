@@ -18,6 +18,18 @@ static class GeometryTests
             "Kompakte Mindestgröße verhindert abgeschnittene Bedienelemente");
         check(WindowPlacement.Fit(new(0, 0, 10, 10), [mainWork], mainWork, 600, 540) == new PixelRect(0, 0, 600, 540),
             "Mindestgröße kann passend zur Windows-Skalierung erhöht werden");
+        var lowerWork = new PixelRect(0, 1040, 1920, 2160);
+        var compact = new PixelRect(200, 640, 480, 400);
+        var expanded = WindowPlacement.Fit(compact with { Height = 820 }, [mainWork, lowerWork], mainWork, anchor: compact);
+        check(expanded == new PixelRect(200, 220, 480, 820),
+            "Aufklappen am unteren Monitorrand bleibt auf dem bisherigen Monitor statt die DPI-Skalierung zu wechseln");
+        var bounds = compact;
+        for (int i = 0; i < 100; i++)
+        {
+            bounds = WindowPlacement.Fit(bounds with { Height = 820 }, [mainWork, lowerWork], mainWork, anchor: bounds);
+            bounds = WindowPlacement.Fit(bounds with { Height = 400 }, [mainWork, lowerWork], mainWork, anchor: bounds);
+        }
+        check(bounds == new PixelRect(200, 220, 480, 400), "Hundert Auf- und Zuklappvorgänge behalten Monitor, Breite und feste Höhen");
         check(new PixelPoint(-1920, -200).DistanceSquaredTo(new(-1917, -196)) == 25,
             "Abstandsprüfung funktioniert auch mit negativen Bildschirmkoordinaten");
         var region = new PixelRect(-100, -50, 80, 60);

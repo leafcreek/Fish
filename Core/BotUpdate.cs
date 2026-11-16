@@ -9,9 +9,9 @@ public static class BotStateLabels
 {
     public static string Label(this BotState state) => state switch
     {
-        BotState.WoWNotRunning => "WoW nicht gefunden", BotState.WoWNotActive => "WoW nicht sichtbar oder minimiert",
-        BotState.Idle => "Bereit zum Auswerfen", BotState.Casting => "Angel auswerfen",
-        BotState.SearchingBobber => "Schwimmer suchen", BotState.Fishing => "Spritzer beobachten",
-        BotState.Looting => "Wartezeit nach Biss", BotState.AdjustingArea => "Suchbereich anpassen", _ => "Bereit"
+        BotState.WoWNotRunning => "Warte auf WoW", BotState.WoWNotActive => "WoW ausgeblendet",
+        BotState.Idle => "Nächster Wurf", BotState.Casting => "Auswerfen",
+        BotState.SearchingBobber => "Schwimmer suchen", BotState.Fishing => "Auf Biss warten",
+        BotState.Looting => "Einholen", BotState.AdjustingArea => "Bereich anpassen", _ => "Bereit"
     };
 }

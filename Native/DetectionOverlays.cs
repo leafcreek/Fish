@@ -6,6 +6,8 @@ namespace Fish.Native;
 /// <summary>Interactive bobber frame and a display-only, click-through splash frame.</summary>
 internal sealed class DetectionOverlays(IGameWindow? windows = null) : IDisposable
 {
+    // COLORREF values (BGR); paired with the Schwimmer/Spritzer accents in the app.
+    private const uint BobberColor = 0xA8B621, SplashColor = 0x4DB8F3, HandleColor = 0x737F08;
     private readonly IGameWindow _windows = windows ?? new GameWindow.Access();
     private OverlayWindow? _bobber, _splash, _move, _resize;
     private nint _game;
@@ -25,18 +27,18 @@ internal sealed class DetectionOverlays(IGameWindow? windows = null) : IDisposab
         _game = game; _client = client;
         if (!IsEditing) _configured = new(options.BobberAreaWidth, options.BobberAreaHeight, options.BobberAreaXOffset, options.BobberAreaYOffset);
         _area = _configured.In(client);
-        _bobber ??= new(0x0000ff);
+        _bobber ??= new(BobberColor);
         DrawBobber();
         bool showSplash = !IsEditing && running && displayed?.Game == game && displayed.BobberArea == _area &&
             displayed.SplashArea != null && displayed.Bobber != null;
         var splash = showSplash ? FishingDefaults.SplashRegion.Around(displayed!.Bobber!.Value, client) : (PixelRect?)null;
-        if (!_area.IsEmpty && splash != null) { _splash ??= new(0xfafafa); _splash.Show(splash); }
+        if (!_area.IsEmpty && splash != null) { _splash ??= new(SplashColor); _splash.Show(splash); }
         else _splash?.Hide();
     }
 
     private OverlayWindow CreateHandle(RegionEditKind kind)
     {
-        var handle = new OverlayWindow(0x0000ff, kind);
+        var handle = new OverlayWindow(HandleColor, kind);
         handle.Dragged += drag => OnDrag(handle, drag);
         handle.InteractionFailed += error => InteractionFailed?.Invoke(error);
         return handle;
@@ -47,7 +49,7 @@ internal sealed class DetectionOverlays(IGameWindow? windows = null) : IDisposab
         _bobber?.Show(_area);
         if (_bobber == null || _area.IsEmpty || _area.Width < 100 || _area.Height < 100)
         { _move?.Hide(); _resize?.Hide(); return; }
-        int size = Math.Clamp((int)Math.Round(16 * Desktop.GetDpiForWindow(_bobber.Handle) / 96.0), 14, 48);
+        int size = Math.Clamp((int)Math.Round(22 * Desktop.GetDpiForWindow(_bobber.Handle) / 96.0), 20, 64);
         _move ??= CreateHandle(RegionEditKind.Move);
         _resize ??= CreateHandle(RegionEditKind.Resize);
         _move.Show(new(_area.X + 2, _area.Y + 2, size, size));

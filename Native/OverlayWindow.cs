@@ -25,6 +25,7 @@ internal sealed class OverlayWindow : IDisposable
     [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(nint window, uint color, byte alpha, uint flags);
     [DllImport("gdi32.dll")] private static extern nint CreateSolidBrush(uint color);
     [DllImport("gdi32.dll")] private static extern nint CreateRectRgn(int left, int top, int right, int bottom);
+    [DllImport("gdi32.dll")] private static extern nint CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
     [DllImport("gdi32.dll")] private static extern int CombineRgn(nint dest, nint source1, nint source2, int mode);
     [DllImport("user32.dll")] private static extern int SetWindowRgn(nint window, nint region, bool redraw);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern nint GetModuleHandleW(string? module);
@@ -76,7 +77,7 @@ internal sealed class OverlayWindow : IDisposable
             handle == RegionEditKind.Move ? "Schwimmer-Bereich verschieben" : handle == RegionEditKind.Resize ? "Schwimmer-Bereich skalieren" : "",
             0x80000000, 0, 0, 1, 1, 0, 0, _instance, 0);
         if (_window == 0) { Dispose(); throw new Win32Exception(Marshal.GetLastWin32Error()); }
-        SetLayeredWindowAttributes(_window, 0, 255, 2);
+        SetLayeredWindowAttributes(_window, 0, handle != null ? (byte)255 : (byte)230, 2);
         if (handle != null) SetWindowDisplayAffinity(_window, 0x11); // Keep control pixels out of captures on supported Windows versions.
     }
     public void Show(PixelRect? bounds)
@@ -85,10 +86,13 @@ internal sealed class OverlayWindow : IDisposable
         if (_bounds == null || _bounds.Value.Width != rect.Width || _bounds.Value.Height != rect.Height)
         {
             int w = rect.Width + (_handle == null ? 4 : 0), h = rect.Height + (_handle == null ? 4 : 0);
-            nint outer = CreateRectRgn(0, 0, w, h), inner = CreateRectRgn(2, 2, w - 2, h - 2);
+            int radius = Math.Max(4, (int)Math.Round(8 * Desktop.GetDpiForWindow(_window) / 96.0));
+            nint outer = _handle == null ? CreateRectRgn(0, 0, w, h) : CreateRoundRectRgn(0, 0, w + 1, h + 1, radius, radius);
+            // Keep every pixel inside the search rectangle clear, including its corners.
+            nint inner = _handle == null ? CreateRectRgn(2, 2, w - 2, h - 2) : 0;
             try
             {
-                if (outer == 0 || inner == 0 || _handle == null && CombineRgn(outer, outer, inner, 4) == 0 || SetWindowRgn(_window, outer, true) == 0)
+                if (outer == 0 || _handle == null && (inner == 0 || CombineRgn(outer, outer, inner, 4) == 0) || SetWindowRgn(_window, outer, true) == 0)
                     throw new Win32Exception("Overlay-Bereich konnte nicht erstellt werden.");
                 outer = 0; // Successful SetWindowRgn transfers ownership to Windows.
             }

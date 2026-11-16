@@ -5,22 +5,47 @@ namespace Fish.Views;
 public sealed partial class MainWindow
 {
     private bool _livePreviewVisible;
+    private bool _previewLayoutQueued;
     private bool CanShowLivePreview => PreviewSection.IsExpanded && IsMainWindowVisible;
 
     private void InitializePreviewLayout()
     {
-        MainScroll.SizeChanged += (_, _) => ResizePreviews();
-        PreviewPanel.SizeChanged += (_, _) => ResizePreviews();
+        PreviewSection.IsExpanded = false;
+        Root.Loaded += (_, _) => QueuePreviewLayout();
+        MainScroll.SizeChanged += (_, _) => QueuePreviewLayout();
+        SettingsCard.SizeChanged += (_, _) => QueuePreviewLayout();
+        PreviewPanel.Loaded += (_, _) => QueuePreviewLayout();
         PreviewSection.RegisterPropertyChangedCallback(Microsoft.UI.Xaml.Controls.Expander.IsExpandedProperty,
-            (_, _) => DispatcherQueue.TryEnqueue(ResizePreviews));
+            (_, _) =>
+            {
+                MainScroll.ChangeView(null, 0, null, disableAnimation: true);
+                QueuePreviewLayout();
+            });
+    }
+
+    private void QueuePreviewLayout()
+    {
+        if (_previewLayoutQueued || _closing || _closeAllowed) return;
+        _previewLayoutQueued = DispatcherQueue.TryEnqueue(() =>
+        {
+            _previewLayoutQueued = false;
+            if (_closing || _closeAllowed) return;
+            EnsureWindowVisible();
+            ResizePreviews();
+        });
     }
 
     private void ResizePreviews()
     {
         if (_closing || _closeAllowed || !PreviewSection.IsExpanded || !PreviewPanel.IsLoaded || MainScroll.ViewportHeight <= 0) return;
-        // Absolute content position keeps the available space independent of the current scroll offset.
-        double top = PreviewPanel.TransformToVisual(MainScroll).TransformPoint(new(0, 0)).Y + MainScroll.VerticalOffset;
-        PreviewPanel.Height = Math.Max(PreviewPanel.MinHeight, MainScroll.ViewportHeight - top);
+        // The expander animates its content position. Use only stable layout measurements,
+        // never the preview's transformed position or its own SizeChanged feedback.
+        const double headerAndBorder = 40;
+        double available = Math.Max(160, MainScroll.ViewportHeight - SettingsCard.ActualHeight - MainContent.Spacing - headerAndBorder);
+        // On a smaller work area all three images shrink together instead of adding a scrollbar.
+        double minimum = Math.Min(380, available);
+        if (PreviewPanel.MinHeight != minimum) PreviewPanel.MinHeight = minimum;
+        if (PreviewPanel.Height != available) PreviewPanel.Height = available;
     }
 
     private void RefreshPreviews()

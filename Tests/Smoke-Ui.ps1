@@ -67,10 +67,11 @@ $settings = Join-Path (Get-Location) ('artifacts\ui-tests\settings-' + [Guid]::N
 $launch = @{ FilePath = (Resolve-Path -LiteralPath $Executable).Path; WindowStyle = 'Hidden'; PassThru = $true }
 if ($BesideExecutable) {
     $settings = Split-Path -Parent $launch.FilePath
-    if ((Test-Path -LiteralPath (Join-Path $settings 'appsettings.json')) -or (Test-Path -LiteralPath (Join-Path $settings 'appsettings.json.bak'))) {
+    if ((Test-Path -LiteralPath (Join-Path $settings 'settings.json')) -or (Test-Path -LiteralPath (Join-Path $settings 'settings.json.bak'))) {
         throw 'Existing settings found next to EXE; refusing to overwrite them.'
     }
-} else { $launch.ArgumentList = @('--settings-directory', $settings) }
+}
+$launch.ArgumentList = @('--settings-directory', $settings)
 $process = Start-Process @launch
 try {
     $window = Wait-FishWindow $process
@@ -106,7 +107,7 @@ try {
     $stepProgress = Find-Element 'StepTimeProgress' -ById
     $stepTime = Find-Element 'StepTimeText' -ById
     if ($stepProgress.GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern).Current.Value -ne 0 -or
-        $stepTime.Current.Name -notlike 'Kein aktiver Schritt*') { throw 'Step progress did not start idle.' }
+        $stepTime.Current.Name -notlike '0,0 / 0,0 s*') { throw 'Step progress did not start idle.' }
     Write-Output 'PASS step progress and elapsed/maximum time appear inside the status card'
     Start-Sleep -Milliseconds 1000
     $process.Refresh()
@@ -282,16 +283,16 @@ try {
     if (!$process.WaitForExit(10000)) { throw 'Fish did not close cleanly.' }
     if ($process.ExitCode -ne 0) { throw "Fish exited with code $($process.ExitCode)" }
     Write-Output 'PASS orderly window close'
-    $settingsFile = Join-Path $settings 'appsettings.json'
+    $settingsFile = Join-Path $settings 'settings.json'
     if (!(Test-Path -LiteralPath $settingsFile)) { throw 'Settings were not saved on close.' }
     $saved = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
     if ($NativeOverlay -and ($saved.BobberAreaWidth -eq 600 -or $saved.BobberAreaHeight -eq 300 -or $saved.BobberAreaXOffset -eq 0 -or $saved.BobberAreaYOffset -eq 0)) { throw 'Edited bobber geometry was not saved.' }
-    if ($saved.FishingHotkey -ne 'Ctrl+F8' -or $saved.SchemaVersion -ne 6) { throw 'Fishing hotkey or settings version was not saved.' }
+    if ($saved.FishingHotkey -ne 'Ctrl+F8' -or $saved.SchemaVersion -ne 7) { throw 'Fishing hotkey or settings version was not saved.' }
     if ($saved.BobberSensitivity -ne 70 -or $saved.SplashSensitivity -ne 80) { throw 'Sensitivity sliders were not saved.' }
-    if ($saved.BobberMatchMinimum -ne 50 -or $saved.BobberColorTolerance -ne 50 -or $saved.SplashPixelTolerance -ne 50 -or $saved.SplashChangePercent -ne 10) { throw 'Slider changes altered the saved midpoint reference.' }
     foreach ($removedProperty in @('Theme','AlwaysOnTop','MinimizeToTray','CloseToTray','CastTimeoutSeconds','BobberTimeoutSeconds',
         'LootDelayMilliseconds','ScanIntervalMilliseconds','SplashAreaWidth','SplashAreaHeight','SplashAreaXOffset','SplashAreaYOffset',
-        'SplashCalibrationMilliseconds','SplashAdaptiveThreshold')) {
+        'SplashCalibrationMilliseconds','SplashAdaptiveThreshold','WindowWidth','WindowHeight','WindowMaximized','WindowDpi',
+        'BobberMatchMinimum','BobberColorTolerance','SplashPixelTolerance','SplashChangePercent')) {
         if ($saved.PSObject.Properties.Name -contains $removedProperty) { throw "Removed setting was still saved: $removedProperty" }
     }
     Write-Output 'PASS automatic save on close'
@@ -317,7 +318,7 @@ finally {
     if (!$process.HasExited) { $process.Kill(); $process.WaitForExit() }
     $process.Dispose()
     if ($BesideExecutable) {
-        foreach ($name in @('appsettings.json', 'appsettings.json.bak')) {
+        foreach ($name in @('settings.json', 'settings.json.bak')) {
             $path = Join-Path $settings $name
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path }
         }

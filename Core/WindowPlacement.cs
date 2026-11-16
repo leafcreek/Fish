@@ -3,10 +3,13 @@ namespace Fish.Core;
 public static class WindowPlacement
 {
     public static PixelRect Fit(PixelRect saved, IReadOnlyList<PixelRect> workAreas, PixelRect fallback,
-        int minimumWidth = Configuration.BotOptions.MinimumWindowWidth, int minimumHeight = Configuration.BotOptions.MinimumWindowHeight)
+        int minimumWidth = Configuration.BotOptions.MinimumWindowWidth, int minimumHeight = Configuration.BotOptions.MinimumWindowHeight,
+        PixelRect? anchor = null)
     {
-        var work = workAreas.OrderByDescending(area => Overlap(saved, area)).FirstOrDefault();
-        bool visible = work.Width > 0 && Overlap(saved, work) > 0;
+        // Resizing must stay on the current monitor, even when the larger target overlaps another one more.
+        var reference = anchor ?? saved;
+        var work = workAreas.OrderByDescending(area => Overlap(reference, area)).FirstOrDefault();
+        bool visible = work.Width > 0 && Overlap(reference, work) > 0;
         if (!visible) work = fallback;
         int width = Math.Clamp(saved.Width, Math.Min(minimumWidth, work.Width), work.Width);
         int height = Math.Clamp(saved.Height, Math.Min(minimumHeight, work.Height), work.Height);

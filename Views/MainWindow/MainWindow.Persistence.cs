@@ -32,12 +32,8 @@ public sealed partial class MainWindow
     {
         if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Restored })
         {
-            _options.WindowWidth = AppWindow.Size.Width; _options.WindowHeight = AppWindow.Size.Height;
             _options.WindowXPosition = AppWindow.Position.X; _options.WindowYPosition = AppWindow.Position.Y;
-            _options.WindowDpi = (int)Desktop.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
         }
-        if (AppWindow.Presenter is OverlappedPresenter state && state.State != OverlappedPresenterState.Minimized)
-            _options.WindowMaximized = state.State == OverlappedPresenterState.Maximized;
         _store.Save(_options);
         _saveAllowed = true;
     }

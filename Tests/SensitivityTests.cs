@@ -1,4 +1,4 @@
-using Fish.Configuration;
+﻿using Fish.Configuration;
 using Fish.Core;
 
 static class SensitivityTests
@@ -9,9 +9,7 @@ static class SensitivityTests
         check(DetectionSensitivity.Bobber(defaults) == new BobberTuning(50, 50) &&
             DetectionSensitivity.Splash(defaults) == new SplashTuning(50, 10),
             "Neue Mittelstellung verwendet 50 Bewertung, 50 Farbtoleranz, 50 Rauschtoleranz und 10 % Mindeständerung");
-        foreach (var reference in new[] { defaults, new BotOptions { BobberMatchMinimum = 88, BobberColorTolerance = 60,
-            SplashPixelTolerance = 24, SplashChangePercent = 7 }, new BotOptions { BobberMatchMinimum = 1,
-                BobberColorTolerance = 255, SplashPixelTolerance = 1, SplashChangePercent = 80 } })
+        foreach (var reference in new[] { defaults })
         {
             var previousBobber = new BobberTuning(99, 0);
             var previousSplash = new SplashTuning(255, 80);
@@ -31,27 +29,28 @@ static class SensitivityTests
             }
             check(monotonic, "Alle 101 Reglerstufen wirken in dieselbe Richtung und behalten Kalibrierung/Wasseranpassung bei");
             reference.BobberSensitivity = reference.SplashSensitivity = 50;
-            check(DetectionSensitivity.Bobber(reference) == new BobberTuning(reference.BobberMatchMinimum, reference.BobberColorTolerance) &&
-                DetectionSensitivity.Splash(reference) == new SplashTuning(reference.SplashPixelTolerance, reference.SplashChangePercent),
-                "Zurück auf 50 stellt die gespeicherten Einzelwerte ohne Drift wieder her");
+            check(DetectionSensitivity.Bobber(reference) == new BobberTuning(50, 50) &&
+                DetectionSensitivity.Splash(reference) == new SplashTuning(50, 10),
+                "Zurück auf 50 stellt die festen Basiswerte ohne Drift wieder her");
         }
         var savedFolder = Path.Combine(folder, "sensitivity");
         var store = new SettingsStore(savedFolder);
         Directory.CreateDirectory(savedFolder);
-        File.WriteAllText(Path.Combine(savedFolder, "appsettings.json"), """
-            {"SchemaVersion":5,"BobberMatchMinimum":42,"BobberColorTolerance":60,
-             "SplashPixelTolerance":24,"SplashChangePercent":7,"WindowWidth":700,"WindowHeight":600}
+        File.WriteAllText(Path.Combine(savedFolder, "settings.json"), """
+            {"SchemaVersion":5,"BobberMatchMinimum":37,"BobberColorTolerance":60,
+             "SplashPixelTolerance":24,"SplashChangePercent":4,"WindowWidth":700,"WindowHeight":600}
             """);
         var migrated = store.Load();
-        check(migrated is { SchemaVersion: 6, BobberSensitivity: 50, SplashSensitivity: 50, WindowWidth: 700, WindowHeight: 600 } &&
-            DetectionSensitivity.Bobber(migrated) == new BobberTuning(42, 60) && DetectionSensitivity.Splash(migrated) == new SplashTuning(24, 7),
-            "Alte Abstimmung wird exakt zur Mittelstellung; eigene Fenstergröße bleibt erhalten");
+        var migratedBobber = DetectionSensitivity.Bobber(migrated);
+        var migratedSplash = DetectionSensitivity.Splash(migrated);
+        check(migrated is { SchemaVersion: 7 } && Math.Abs(migratedBobber.MinimumRating - 37) <= 2 &&
+            Math.Abs(migratedBobber.ColorTolerance - 60) <= 2 && migratedSplash == new SplashTuning(24, 4),
+            "Alte Einzelwerte werden in die nächstpassenden Reglerstellungen übertragen");
         migrated.BobberSensitivity = 72; migrated.SplashSensitivity = 81;
         var snapshot = FishingOptions.From(migrated);
         for (int i = 0; i < 3; i++) { store.Save(migrated); migrated = store.Load(); }
-        check(migrated is { BobberSensitivity: 72, SplashSensitivity: 81, BobberMatchMinimum: 42, BobberColorTolerance: 60,
-            SplashPixelTolerance: 24, SplashChangePercent: 7 } && FishingOptions.From(migrated) == snapshot,
-            "Reglerpositionen und Referenzen überstehen mehrere Neustarts ohne erneute Verstärkung");
+        check(migrated is { BobberSensitivity: 72, SplashSensitivity: 81 } && FishingOptions.From(migrated) == snapshot,
+            "Reglerpositionen überstehen mehrere Neustarts ohne erneute Verstärkung");
         migrated.BobberSensitivity = 0; migrated.SplashSensitivity = 100;
         check(FishingOptions.From(migrated) != snapshot, "Laufzeitschnappschuss bleibt von späteren Slider-Änderungen unabhängig");
 

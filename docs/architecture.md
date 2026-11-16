@@ -1,10 +1,20 @@
 # Architektur
 
+## Fenster und Überwachung
+
+Das Fenster verwendet feste, DPI-skalierte Zielgrößen für geschlossene und geöffnete Überwachung. Beim Anpassen wird der Monitor anhand der bisherigen Fensterfläche gewählt, nicht anhand der größeren Zielfläche. So kann Aufklappen am Monitorrand keinen Wechsel auf einen anderen Monitor mit anderer Skalierung auslösen.
+
+Layout-Anforderungen werden über den Dispatcher zusammengefasst. Die Bildhöhe ergibt sich ausschließlich aus dem verfügbaren Sichtbereich, der Einstellungsfläche und dem Platz für den Überwachungskopf. Animierte Bildschirmpositionen und Größenereignisse der Vorschau selbst fließen nicht in die Berechnung ein; dadurch entstehen keine Rückkopplungen beim wiederholten oder schnellen Umschalten.
+
 ## Ablauf und Konfiguration
 
 `BotEngine` besitzt die Lebensdauer einer Sitzung, übernimmt Konfigurationsänderungen atomar und leitet Status- und Bildereignisse weiter. Parallele Läufe derselben Engine sind ausgeschlossen. `FishingSession` führt den Ablauf seriell aus: Auswerfen, zwei Sekunden Anwurf, fünf Sekunden Schwimmer-Suche, Spritzer-Beobachtung und Loot-Wartezeit. Das Gesamtlimit bleibt bei 25 Sekunden ab Wurf.
 
-`BotOptions` ist das gespeicherte UI-Modell. `SettingsStore` validiert und migriert es und schreibt atomar mit Sicherung. Die getrennt gespeicherten Referenzpaare erhalten die bisherige Abstimmung bei Toleranz 50. `DetectionSensitivity` erzeugt daraus über weiche, monotone Kurven die effektiven Werte. `FishingOptions` enthält nur veränderliche Sitzungswerte; feste Zeiten, Geometrie und Wasseranpassung werden aus `FishingDefaults` gelesen und nicht pro Schnappschuss kopiert.
+`BotOptions` enthält ausschließlich Formatversion, Angeltaste, beide Toleranzregler, Schwimmerbereich und Fensterposition. `DetectionSensitivity` erzeugt über feste, weiche und monotone Kurven die effektiven Erkennungswerte. `FishingOptions` enthält nur veränderliche Sitzungswerte; feste Zeiten, Geometrie, Wasseranpassung und die Basiswerte 50/50/50/10 stammen aus `FishingDefaults`.
+
+`SettingsStore` speichert `settings.json` standardmäßig unter `%LOCALAPPDATA%\Fish`; ein expliziter Speicherordner bleibt für portable Nutzung und Tests möglich. `appsettings.json` neben der tatsächlichen EXE wird nur übernommen, wenn am Ziel weder Hauptdatei noch Sicherung vorhanden ist. `SettingsMigration` überträgt frühere Referenzpaare auf die nächstpassenden Reglerstellungen; Standardpaare behalten ihre Stellungen exakt. Schema 7 schreibt die alten Einzelwerte und festen Fensteroptionen nicht mehr.
+
+Ein benannter Mutex pro Speicherordner serialisiert Lesen, Migration, Wiederherstellung und Schreiben innerhalb der Windows-Sitzung. Schreiben verwendet eine temporäre Datei und anschließendes Ersetzen. Eine gültige vorherige Datei wird als `.bak` gesichert. Bei JSON-Schäden wird eine gültige Sicherung eingespielt und das Original separat archiviert. Neuere Formate und reine Zugriffsfehler lösen keinen Rückfall auf ältere Daten aus. Ohne gültige Wiederherstellung blockiert das Fenster weitere Schreibversuche. Mehrere Instanzen verwenden zuletzt gespeicherte vollständige Zustände; Änderungen werden nicht feldweise zusammengeführt.
 
 Bereichsbearbeitung ist eine eigenständige Eingabesperre. `SetAreaEditing` erhöht bei jeder Änderung eine Versionsnummer. Damit wird auch eine Aufnahme verworfen, während der eine komplette Bearbeitung zwischen zwei Schleifendurchläufen stattfand. Stop und Konfigurationsänderungen werden vor Eingaben und nach aufwendigen Scans erneut geprüft.
 
