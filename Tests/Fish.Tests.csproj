@@ -6,13 +6,21 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../Assets/Bobber/forever.png" LogicalName="Fish.Bobber.forever.png" />
+    <EmbeddedResource Include="Fixtures/bobber-reference.png" LogicalName="Fish.Tests.bobber-reference.png" />
+    <EmbeddedResource Include="../Assets/Detection/bobber.json" LogicalName="Fish.Bobber.colors.json" />
     <EmbeddedResource Include="Fixtures/forever-water.png" LogicalName="Fish.Tests.forever-water.png" />
-    <Compile Include="../ViewModels/MainViewModel.cs" Link="ViewModels/MainViewModel.cs" />
+    <EmbeddedResource Include="Fixtures/forever-feathered-bobber.png" LogicalName="Fish.Tests.forever-feathered-bobber.png" />
+    <EmbeddedResource Include="Fixtures/forever-bobber-area.png" LogicalName="Fish.Tests.forever-bobber-area.png" />
+    <EmbeddedResource Include="Fixtures/forever-water-cursor.png" LogicalName="Fish.Tests.forever-water-cursor.png" />
+    <EmbeddedResource Include="Fixtures/forever-shore.png" LogicalName="Fish.Tests.forever-shore.png" />
+    <EmbeddedResource Include="Fixtures/forever-sunset.png" LogicalName="Fish.Tests.forever-sunset.png" />
+    <EmbeddedResource Include="Fixtures/forever-sunset-area.png" LogicalName="Fish.Tests.forever-sunset-area.png" />
+    <EmbeddedResource Include="Fixtures/forever-night.png" LogicalName="Fish.Tests.forever-night.png" />
+    <EmbeddedResource Include="Fixtures/forever-forest.png" LogicalName="Fish.Tests.forever-forest.png" />
+    <EmbeddedResource Include="Fixtures/forever-body.png" LogicalName="Fish.Tests.forever-body.png" />
     <Compile Include="../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
     <Compile Include="../Configuration/*.cs" Link="Configuration/%(Filename)%(Extension)" />
     <Compile Include="../Native/*.cs" Link="Native/%(Filename)%(Extension)" />
-    <Compile Include="../Services/UpdateService.cs" Link="Services/UpdateService.cs" />
     <Compile Include="../Services/BotDesktop.cs" Link="Services/BotDesktop.cs" />
   </ItemGroup>
 </Project>

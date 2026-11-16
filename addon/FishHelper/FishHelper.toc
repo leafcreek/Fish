@@ -1,8 +1,0 @@
-## Interface: 16001
-## Title: FishHelper
-## Notes: Lightweight fishing status pixel for Fish.
-## Notes-deDE: Schlanker Angel-Statuspixel fuer Fish.
-## Author: Fish contributors
-## Version: 0.1.0
-
-FishHelper.lua

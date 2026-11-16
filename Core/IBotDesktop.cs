@@ -1,13 +1,8 @@
 namespace Fish.Core;
 
-public interface IBotDesktop
+public interface IBotDesktop : IGameWindow
 {
-    nint FindGame();
-    bool IsAvailable(nint game);
-    PixelRect? GetGameBounds(nint game);
     PixelFrame Capture(PixelRect bounds);
-    void Key(nint game, int key, CancellationToken cancellation);
-    Task LootAsync(nint game, PixelPoint point, PixelRect expectedBounds, CancellationToken cancellation);
-    void CloseGame(nint game, CancellationToken cancellation);
-    void Shutdown(CancellationToken cancellation);
+    Task<bool> CastAsync(nint game, FishingHotkey hotkey, PixelRect expectedBounds, CancellationToken cancellation);
+    Task<bool> LootAsync(nint game, PixelPoint point, PixelRect expectedBounds, CancellationToken cancellation);
 }

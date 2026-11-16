@@ -88,22 +88,30 @@ static class SplashMotionTests
         check(detector.Analyze(water, Start.AddMilliseconds(150)).Measurement.ChangedPercent == 0,
             "Referenz bleibt nach einer Änderung des vom Aufrufer übergebenen Bildpuffers erhalten");
 
-        var buffer = new PreviewBuffer();
-        buffer.Add(bite, true, true, result.Measurement);
-        var preview = buffer.Take();
-        check(preview.LiveMotion == result.Measurement && preview.SplashMotion == result.Measurement &&
-            preview.Splash != null, "Vorschau transportiert Bild und zugehörige Bewegungsmessung gemeinsam");
-        buffer.Add(bite, true, true, result.Measurement);
-        buffer.ClearLive(); preview = buffer.Take();
-        check(preview.Live == null && preview.LiveMotion == null && preview.Splash != null,
-            "Pausierte Vorschau entfernt nur das Livebild und dessen Messwerte");
-
         detector = new(20, 5, true, 500);
         var small = Frame(120, 100, 0x405060);
         Warm(detector, small);
         var timer = Stopwatch.StartNew();
         for (int i = 0; i < 100; i++) detector.Analyze(small, Start.AddSeconds(i + 1));
         Console.WriteLine($"MOTION 120 × 100: {timer.Elapsed.TotalMilliseconds / 100:F3} ms/Scan");
+        var noPreview = new SplashMotionDetector(20, 5, false, 500);
+        Warm(noPreview, small);
+        var changed = Block(small, 10, 10, 30, 30, 0xffffff);
+        var measurementOnly = noPreview.Analyze(changed, Start.AddSeconds(5), createPreview: false);
+        check(measurementOnly.Measurement.NewTrigger && ReferenceEquals(measurementOnly.Preview, changed),
+            "Ohne Vorschau bleibt die Bisserkennung aktiv und erzeugt keine markierte Bildkopie");
+        var foundOnly = new SplashMotionDetector(20, 5, false, 500);
+        Warm(foundOnly, small);
+        var hiddenOrdinary = foundOnly.Analyze(small, Start.AddSeconds(4), createPreview: false, previewOnTrigger: true);
+        var hiddenBite = foundOnly.Analyze(changed, Start.AddSeconds(5), createPreview: false, previewOnTrigger: true);
+        check(ReferenceEquals(hiddenOrdinary.Preview, small) && hiddenBite.Measurement.NewTrigger &&
+            !ReferenceEquals(hiddenBite.Preview, changed) && hiddenBite.Preview.Pixels[10 * changed.Width + 10] != changed.Pixels[10 * changed.Width + 10],
+            "Ohne Live-Vorschau wird nur beim Biss eine rot markierte Fundbildkopie erzeugt");
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        bool stopped = false;
+        try { noPreview.Analyze(changed, Start.AddSeconds(6), cancelled.Token); }
+        catch (OperationCanceledException) { stopped = true; }
+        check(stopped, "Splash-Vergleich respektiert Stop vor jeder Auswertung");
     }
 
     private static void Warm(SplashMotionDetector detector, PixelFrame frame)

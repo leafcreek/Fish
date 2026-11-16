@@ -1,0 +1,89 @@
+{
+  "SourceFingerprint": "D45C4471B3047F488069AC16FEA57A434C2C23D4497CC9155593D7D59D1DA14E",
+  "Width": 91,
+  "Height": 88,
+  "Anchor": {
+    "X": 72,
+    "Y": 66
+  },
+  "Blue": {
+    "Name": "Blaue Feder",
+    "Hex": "#2F364B",
+    "Hue": 225,
+    "Saturation": 0.3733333333333333,
+    "HueTolerance": 28,
+    "MinimumSaturation": 0.11199999999999999,
+    "Center": {
+      "X": 41,
+      "Y": 16
+    },
+    "Bounds": {
+      "X": 20,
+      "Y": 0,
+      "Width": 48,
+      "Height": 40
+    },
+    "Pixels": 656,
+    "Metallic": false
+  },
+  "Red": {
+    "Name": "Rote Feder",
+    "Hex": "#4D170B",
+    "Hue": 10.909090909090912,
+    "Saturation": 0.8571428571428571,
+    "HueTolerance": 18,
+    "MinimumSaturation": 0.2571428571428571,
+    "Center": {
+      "X": 34,
+      "Y": 34
+    },
+    "Bounds": {
+      "X": 0,
+      "Y": 23,
+      "Width": 66,
+      "Height": 24
+    },
+    "Pixels": 938,
+    "Metallic": false
+  },
+  "Body": {
+    "Name": "Schwimmerk\u00F6rper",
+    "Hex": "#76563D",
+    "Hue": 26.315789473684212,
+    "Saturation": 0.4830508474576271,
+    "HueTolerance": 18,
+    "MinimumSaturation": 0.14491525423728813,
+    "Center": {
+      "X": 72,
+      "Y": 64
+    },
+    "Bounds": {
+      "X": 53,
+      "Y": 43,
+      "Width": 38,
+      "Height": 45
+    },
+    "Pixels": 1501,
+    "Metallic": false
+  },
+  "Metal": {
+    "Name": "Metall\u00F6se",
+    "Hex": "#B4B5B5",
+    "Hue": 180,
+    "Saturation": 0.0055248618784530185,
+    "HueTolerance": 0,
+    "MinimumSaturation": 0.1,
+    "Center": {
+      "X": 71,
+      "Y": 25
+    },
+    "Bounds": {
+      "X": 64,
+      "Y": 15,
+      "Width": 15,
+      "Height": 27
+    },
+    "Pixels": 129,
+    "Metallic": true
+  }
+}

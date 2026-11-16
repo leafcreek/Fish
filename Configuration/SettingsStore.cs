@@ -18,7 +18,23 @@ public sealed class SettingsStore
         var json = File.ReadAllText(path);
         var options = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.BotOptions)
             ?? throw new InvalidDataException("Die Einstellungsdatei ist leer.");
-        if (options.SchemaVersion > 1) throw new InvalidDataException("Diese Einstellungen stammen aus einer neueren Fish-Version.");
+        if (options.SchemaVersion > BotOptions.CurrentSchemaVersion) throw new InvalidDataException("Diese Einstellungen stammen aus einer neueren Fish-Version.");
+        if (options.SchemaVersion < 5)
+        {
+            options.WindowWidth = BotOptions.DefaultWindowWidth; options.WindowHeight = BotOptions.DefaultWindowHeight;
+            options.WindowDpi = 96;
+            options.WindowMaximized = false;
+        }
+        if (options.SchemaVersion < 6)
+        {
+            double scale = Math.Max(96, options.WindowDpi) / 96.0;
+            if (!options.WindowMaximized && options.WindowWidth == (int)Math.Round(480 * scale) &&
+                options.WindowHeight == (int)Math.Round(500 * scale))
+                options.WindowHeight = (int)Math.Round(BotOptions.DefaultWindowHeight * scale);
+            // The previous independent settings become the midpoint of the new controls.
+            options.BobberSensitivity = options.SplashSensitivity = 50;
+        }
+        options.SchemaVersion = BotOptions.CurrentSchemaVersion;
         options.Normalize();
         return options;
     }

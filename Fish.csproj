@@ -1,79 +1,32 @@
 <Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup>
+  <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-
     <RootNamespace>Fish</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\gold-fish.ico</ApplicationIcon>
-
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
-
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- Single-file WinUI builds need PRI tooling even for an unpackaged app. -->
+    <EnableMsixTooling Condition="'$(PublishSingleFile)' == 'true'">true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Never bundle previous builds, screenshots, diagnostics or publish output. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish\**</DefaultItemExcludes>
-
-    <!-- Fish ist grundsätzlich eine unpackaged App -->
-    <WindowsPackageType>None</WindowsPackageType>
-
-    <!-- dotnet run / Debug soll die normale unpackaged App starten -->
-    <EnableWinAppRunSupport>false</EnableWinAppRunSupport>
-</PropertyGroup>
-
-  <ItemGroup>
-    <Manifest Include="$(ApplicationManifest)" />
-    <Compile Remove="Tests\**\*.cs" />
-    <Content Remove="Tests\**" />
-    <None Remove="Tests\**" />
-    <EmbeddedResource Include="Assets\Bobber\forever.png" LogicalName="Fish.Bobber.forever.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Remove="artifacts\**\*" />
-    <None Remove="artifacts\**\*" />
-    <EmbeddedResource Remove="artifacts\**\*" />
-</ItemGroup>
-
-  <!--
-    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
-    Tools extension to be activated for this project even if the Windows App SDK Nuget
-    package has not yet been restored.
-  -->
-  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <ProjectCapability Include="Msix" />
-  </ItemGroup>
-
-  <!--
-    Microsoft.Windows.SDK.BuildTools.WinApp adds first-class support for
-    `dotnet run` on packaged WinUI apps: it hooks the .NET CLI Run target to
-    register a debug identity via the winapp CLI and launch the app with
-    package identity (AUMID).
-    Set <EnableWinAppRunSupport>false</EnableWinAppRunSupport> in a
-    <PropertyGroup> above to opt out.
-  -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.6.1" />
-  </ItemGroup>
-
-  <!--
-    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
-    Explorer "Package and Publish" context menu entry to be enabled for this project even if
-    the Windows App SDK Nuget package has not yet been restored.
-  -->
-  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
-  </PropertyGroup>
-
-  <!-- Publish Properties -->
-  <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
     <!-- Runtime WinUI bindings must remain available in published builds. -->
     <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+    <Compile Remove="Tests\**\*.cs" />
+    <Content Remove="Tests\**;artifacts\**\*" />
+    <None Remove="Tests\**;artifacts\**\*" />
+    <EmbeddedResource Remove="artifacts\**\*" />
+    <EmbeddedResource Include="Assets\Detection\bobber.json" LogicalName="Fish.Bobber.colors.json" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
 </Project>

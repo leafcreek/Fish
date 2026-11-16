@@ -23,7 +23,6 @@ internal static class Desktop
     [DllImport("user32.dll")] internal static extern bool IsWindow(nint window);
     [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] internal static extern bool IsIconic(nint window);
-    [DllImport("user32.dll")] internal static extern int GetWindowLongW(nint window, int index);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool PostMessageW(nint window, uint message, nint wParam, nint lParam);
     [DllImport("user32.dll")] internal static extern bool ScreenToClient(nint window, ref Point point);
     [DllImport("user32.dll")] internal static extern bool GetClientRect(nint window, out Rect rect);

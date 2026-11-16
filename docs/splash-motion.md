@@ -8,26 +8,30 @@ Das erste Bild dient als Referenz. Die Erkennung wird frühestens nach der Kalib
 
 | Einstellung | Standard | Wirkung |
 | --- | --- | --- |
-| Scan-Intervall | 150 ms | Wartezeit zwischen den Scans; Aufnahme und Verarbeitung kommen hinzu |
-| Pixel-Rauschtoleranz | 20 | Mindeständerung eines RGB-Kanals; größere Werte ignorieren mehr kleine Farbänderungen |
-| Mindeständerung | 5 % | Untergrenze des nötigen Anteils veränderter Pixel; einstellbar 1–80 % |
-| Kalibrierung | 500 ms | Anfangsphase nach neuer Referenz; einstellbar 300–3000 ms |
-| Wasserbewegung berücksichtigen | Ein | Erhöht die wirksame Grenze gegenüber gewöhnlicher Bewegung |
+| Scan-Intervall | Fest 100 ms | Wartezeit zwischen den Scans; Aufnahme und Verarbeitung kommen hinzu |
+| Pixel-Rauschtoleranz | 50 | Mindeständerung eines RGB-Kanals; größere Werte ignorieren mehr kleine Farbänderungen |
+| Mindeständerung | 10 % | Untergrenze des nötigen Anteils veränderter Pixel |
+| Kalibrierung | 1000 ms | Feste Anfangsphase nach neuer Referenz |
+| Wasserbewegung berücksichtigen | Immer ein | Erhöht die wirksame Grenze gegenüber gewöhnlicher Bewegung |
 
-Die Baseline der normalen Bewegung ist ein gleitender Mittelwert mit Gewicht 0,15. Bei eingeschalteter Anpassung gilt `Grenze = min(80, max(Mindeständerung, 2,5 × Normalbewegung + 2))`, jeweils in Prozentpunkten. Nach der Kalibrierung werden Ausschläge oberhalb der Grenze und erkannte Treffer nicht in die Baseline eingelernt. Die Baseline gilt nur für die aktuelle Beobachtung und wird nicht in Einstellungen gespeichert. Ohne Anpassung gilt die konfigurierte Mindeständerung direkt.
+Die Baseline der normalen Bewegung ist ein gleitender Mittelwert mit Gewicht 0,15. Die immer aktive Anpassung verwendet `Grenze = min(80, max(Mindeständerung, 2,5 × Normalbewegung + 2))`, jeweils in Prozentpunkten. Nach der Kalibrierung werden Ausschläge oberhalb der Grenze und erkannte Treffer nicht in die Baseline eingelernt. Die Baseline gilt nur für die aktuelle Beobachtung und wird nicht in Einstellungen gespeichert.
 
 ## Schutz vor Fehlertreffern
 
 Neben dem Gesamtanteil muss mindestens eine zusammenhängende Gruppe veränderter Pixel ein Prozent der Bildfläche umfassen, mindestens vier Pixel. Diagonale Nachbarn zählen zur selben Gruppe. Viele isolierte Schneepixel reichen daher nicht aus.
 
-Bei einer Änderung von mindestens 85 % der Bildfläche wird ein Bildwechsel angenommen. Der Bot verwirft den Fundpunkt, sucht den Bobber neu und kalibriert erneut. Fensterbewegung, Größenänderung und unterbrochener Status verwerfen ebenfalls die alte Referenz. Kleinere Kamerabewegungen können trotzdem einem Splash ähneln; für die Beurteilung ist eine ruhige Kamera sinnvoll.
+Bei einer Änderung von mindestens 85 % der Bildfläche wird ein Bildwechsel angenommen. Der Bot verwirft den Fundpunkt, sucht den Bobber neu und kalibriert erneut. Fensterbewegung, Größenänderung und unterbrochene Verfügbarkeit verwerfen ebenfalls die alte Referenz. Kleinere Kamerabewegungen können trotzdem einem Splash ähneln; für die Beurteilung ist eine ruhige Kamera sinnvoll.
 
-Nach einem Treffer wird pro Wurf nur eine Loot-Anfrage gesendet, auch wenn der Effekt verschwindet, wieder erscheint oder das Fenster anschließend bewegt wird. Geklickt wird auf den gespeicherten Körper-Anker des Bobbers. Die Position veränderter Wasserpixel bestimmt nicht den Klickpunkt. Erst der Statuspixel bestätigt tatsächlichen Loot. Ein neuer Wurf setzt die Sperre zurück.
+Nach einem Treffer wird auf den gespeicherten Körper-Anker des Bobbers geklickt. Die Position veränderter Wasserpixel bestimmt nicht den Klickpunkt. Der [Angelablauf](fishing-cycle.md) wechselt nach gesendeter Eingabe in eine feste Wartezeit, stoppt die Bildvergleiche dieses Wurfs und wirft anschließend erneut aus. Wird die Eingabe wegen eines Fenster- oder Fokuswechsels nicht gesendet, beginnt eine neue Bobber-Suche innerhalb der verbleibenden Angelzeit. Tatsächlicher Loot wird nicht bestätigt.
 
 ## Live-Prüfung
 
-Die Live-Vorschau zeigt rote Änderungen sowie aktuellen Änderungsanteil, wirksame Grenze, normale Bewegung und Kalibrier-/Auslösestatus. Das letzte Splash-Fundbild behält die Messwerte seines Treffers. Das Protokoll hält bei einer Loot-Anfrage die Änderung, Grenze, größte zusammenhängende Gruppe und den Klickpunkt fest.
+Die Überwachung zeigt die Fundbilder für Schwimmer und Spritzer oben nebeneinander und die große Liveansicht darunter. Rote Änderungen bleiben in den Bildern markiert; zusätzliche Messwerte und Statuszeilen unter den Bildern werden nicht angezeigt.
 
-Zuerst gewöhnliche Wasserbewegung beobachten, dann die Ausschläge bei echten Bissen vergleichen. Bei vielen kleinen Änderungen kann die Pixel-Rauschtoleranz erhöht werden. Eine niedrigere Mindeständerung reagiert empfindlicher; bei eingeschalteter Anpassung kann die wirksame Grenze weiterhin höher liegen. Einzelbilder und Simulationen belegen keine zuverlässige Erkennung in einer echten Angelsitzung.
+Ist die Live-Vorschau eingeklappt oder das Fenster verborgen, läuft die Erkennung weiter, ohne für jeden Scan ein Vorschaubild aufzubereiten. Ein bestätigter Biss erzeugt weiterhin sein markiertes Fundbild. Die Vorschau verändert weder Vergleichsreferenz noch Auslöseschwelle.
 
-Die bisherigen Einstellungen `SplashAreaTolerance`, `SplashAreaAutoLearn` und `PerformanceSkip` werden ignoriert. Es wird immer jeder Pixel des Splash-Bereichs verglichen; dessen gespeicherte Größe und Versätze bleiben erhalten.
+Der Spritzer-Toleranzs-Slider koppelt Rauschtoleranz und Mindeständerung und lässt sich bei aktivem Bot ändern. Bei neuen Einstellungen gelten bei 0 die Werte 100 / 25 %, bei 50 die Werte 50 / 10 % und bei 100 die Werte 10 / 1 %. Zwischenwerte folgen einer weichen Kurve. Gespeicherte Einzelwerte werden bei einer Migration als Referenz für 50 erhalten. Änderungen verwerfen die bisherige Bewegungsreferenz und kalibrieren neu. Der Bereich bleibt fest 50 × 50 px ohne Versatz, das Scan-Intervall beträgt 100 ms zusätzlich zur Verarbeitung. Kalibrierung ist fest 1000 ms und Wasseranpassung immer aktiv.
+
+Zuerst gewöhnliche Wasserbewegung beobachten, dann die Ausschläge bei echten Bissen vergleichen. Bei Fehlertreffern den Slider nach links, bei übersehenen Bissen vorsichtig nach rechts bewegen. Die Wasseranpassung kann die wirksame Prozentgrenze weiterhin erhöhen. Einzelbilder und Simulationen belegen keine zuverlässige Erkennung in einer echten Angelsitzung.
+
+Es wird jeder Pixel des Splash-Bereichs verglichen. Referenz-, Änderungs- und Suchpuffer werden wiederverwendet. Unveränderte Bilder benötigen weder eine Suche nach Pixelgruppen noch eine zusätzliche markierte Kopie. Ohne angeschlossene Vorschau wird ebenfalls keine markierte Bildkopie erzeugt. Laufende Vergleiche und die Gruppensuche reagieren auf Stop.

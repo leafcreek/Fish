@@ -1,3 +1,4 @@
+using Fish.Views;
 using Microsoft.UI.Xaml;
 namespace Fish;
 public partial class App : Application
