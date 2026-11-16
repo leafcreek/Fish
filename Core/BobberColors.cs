@@ -72,26 +72,3 @@ internal sealed record BobberColorProfile(string SourceFingerprint, int Width, i
         return profile;
     }
 }
-
-/// <summary>Adds a per-channel RGB acceptance radius; quality depends on the pixel, not the slider value.</summary>
-internal readonly struct BobberColorMatcher
-{
-    private readonly BobberColorSignature _signature;
-    private readonly int _rgb, _tolerance;
-
-    public BobberColorMatcher(BobberColorSignature signature, int tolerance)
-    {
-        _signature = signature;
-        _rgb = Convert.ToInt32(signature.Hex[1..], 16);
-        _tolerance = tolerance;
-    }
-
-    public double Similarity(int pixel, HsvColor color)
-    {
-        double original = _signature.Similarity(color);
-        if (original > 0 || _tolerance == 0) return original;
-        int distance = Math.Max(Math.Abs(((pixel >> 16) & 255) - ((_rgb >> 16) & 255)),
-            Math.Max(Math.Abs(((pixel >> 8) & 255) - ((_rgb >> 8) & 255)), Math.Abs((pixel & 255) - (_rgb & 255))));
-        return distance <= _tolerance ? 1 - .3 * distance / 255.0 : 0;
-    }
-}

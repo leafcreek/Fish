@@ -6,7 +6,7 @@ namespace Fish.Native;
 /// <summary>Interactive bobber frame and a display-only, click-through splash frame.</summary>
 internal sealed class DetectionOverlays(IGameWindow? windows = null) : IDisposable
 {
-    // COLORREF values (BGR); paired with the Schwimmer/Spritzer accents in the app.
+    // COLORREF values (BGR); paired with the Schwimmer/Biss accents in the app.
     private const uint BobberColor = 0xA8B621, SplashColor = 0x4DB8F3, HandleColor = 0x737F08;
     private readonly IGameWindow _windows = windows ?? new GameWindow.Access();
     private OverlayWindow? _bobber, _splash, _move, _resize;

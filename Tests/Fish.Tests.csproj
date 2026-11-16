@@ -16,6 +16,7 @@
     <EmbeddedResource Include="Fixtures/forever-sunset.png" LogicalName="Fish.Tests.forever-sunset.png" />
     <EmbeddedResource Include="Fixtures/forever-sunset-area.png" LogicalName="Fish.Tests.forever-sunset-area.png" />
     <EmbeddedResource Include="Fixtures/forever-night.png" LogicalName="Fish.Tests.forever-night.png" />
+    <EmbeddedResource Include="Fixtures/forever-dark-sea.png" LogicalName="Fish.Tests.forever-dark-sea.png" />
     <EmbeddedResource Include="Fixtures/forever-forest.png" LogicalName="Fish.Tests.forever-forest.png" />
     <EmbeddedResource Include="Fixtures/forever-body.png" LogicalName="Fish.Tests.forever-body.png" />
     <Compile Include="../Core/*.cs" Link="Core/%(Filename)%(Extension)" />

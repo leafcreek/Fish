@@ -12,7 +12,7 @@ Die Zeitgrenzen werden vor Aktionen und nach aufwendiger Erkennung geprüft. Ver
 
 ## Änderungen und Unterbrechungen
 
-Die Engine übernimmt atomar eine unveränderliche Konfiguration. Ein neuer Hotkey gilt ab dem nächsten Wurf. Änderungen an Bobber-Bereich, Mindestbewertung oder Farbtoleranz verwerfen den Fundpunkt. Änderungen an Splash-Rauschtoleranz oder Mindeständerung verwerfen die Referenz. Zeiten, Kalibrierung, Wasseranpassung und Splash-Geometrie sind fest vorgegeben. Noch laufende Ergebnisse der alten Konfiguration dürfen keine Eingabe auslösen.
+Die Engine übernimmt atomar eine unveränderliche Konfiguration. Ein neuer Hotkey gilt ab dem nächsten Wurf. Beide Toleranzregler wirken bereits beim nächsten Bildvergleich, ohne den laufenden Schritt, seine Zeit, den gefundenen Schwimmer oder eine begonnene Bestätigung zurückzusetzen. Die Bisserkennung behält das vorherige Bild und die Kalibrierung; ihre gelernte Wasserbewegung wird für die neue Rauschtoleranz neu bewertet. Nur eine veränderte Suchbereichsgeometrie verwirft den Fundpunkt. Zeiten, Kalibrierung, Wasseranpassung und Biss-Geometrie sind fest vorgegeben. Noch laufende Ergebnisse veralteter, für den jeweiligen Scan relevanter Einstellungen dürfen keine Eingabe auslösen.
 
 Fensterbewegung, Größenänderung und großflächiger Bildwechsel verwerfen alte Fundpunkte. Erneute Bobber-Suchen bekommen einen eigenen Suchzeitraum, verlängern aber nicht die gesamte Wurfdauer. Minimiertes WoW pausiert Aufnahme und Eingaben. Eine abgelaufene Wurfdauer wird nach Wiederherstellung behandelt. Vorübergehend außerhalb liegende Suchbereiche pausieren, bis sie korrigiert werden. Die Rahmen folgen nur dem aktuellen Spielfenster; ein Splash-Rahmen erscheint erst nach Bobber-Fund.
 

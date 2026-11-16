@@ -26,11 +26,11 @@ Nach einem Treffer wird auf den gespeicherten Körper-Anker des Bobbers geklickt
 
 ## Live-Prüfung
 
-Die Überwachung zeigt die Fundbilder für Schwimmer und Spritzer oben nebeneinander und die große Liveansicht darunter. Rote Änderungen bleiben in den Bildern markiert; zusätzliche Messwerte und Statuszeilen unter den Bildern werden nicht angezeigt.
+Die Überwachung zeigt die Fundbilder für Schwimmer und Biss oben nebeneinander und die große Liveansicht darunter. Rote Änderungen bleiben in den Bildern markiert; zusätzliche Messwerte und Statuszeilen unter den Bildern werden nicht angezeigt.
 
 Ist die Live-Vorschau eingeklappt oder das Fenster verborgen, läuft die Erkennung weiter, ohne für jeden Scan ein Vorschaubild aufzubereiten. Ein bestätigter Biss erzeugt weiterhin sein markiertes Fundbild. Die Vorschau verändert weder Vergleichsreferenz noch Auslöseschwelle.
 
-Der Spritzer-Toleranz-Slider koppelt Rauschtoleranz und Mindeständerung und lässt sich bei aktivem Bot ändern. Bei 0 gelten die Werte 100 / 25 %, bei 50 die Werte 50 / 10 % und bei 100 die Werte 10 / 1 %. Zwischenwerte folgen einer festen weichen Kurve. Frühere individuell gespeicherte Einzelwerte werden auf die nächstpassende Reglerstellung übertragen und nicht mehr separat gespeichert. Änderungen verwerfen die bisherige Bewegungsreferenz und kalibrieren neu. Der Bereich bleibt fest 50 × 50 px ohne Versatz, das Scan-Intervall beträgt 100 ms zusätzlich zur Verarbeitung. Kalibrierung ist fest 1000 ms und Wasseranpassung immer aktiv.
+Der Biss-Toleranz-Slider koppelt Rauschtoleranz und Mindeständerung und lässt sich bei aktivem Bot ändern. Bei 0 gelten die Werte 100 / 25 %, bei 50 die Werte 50 / 10 % und bei 100 die Werte 10 / 1 %. Zwischenwerte folgen einer festen weichen Kurve. Frühere individuell gespeicherte Einzelwerte werden auf die nächstpassende Reglerstellung übertragen und nicht mehr separat gespeichert. Änderungen wirken direkt beim nächsten Bildvergleich. Referenzbild, Kalibrierzeit und gelernte Wasserbewegung bleiben erhalten; die Wasserbasis wird anhand ihrer bisherigen Farbabweichungen auf die neue Rauschtoleranz umgerechnet. Der Bereich bleibt fest 50 × 50 px ohne Versatz, das Scan-Intervall beträgt 100 ms zusätzlich zur Verarbeitung. Kalibrierung ist fest 1000 ms und Wasseranpassung immer aktiv.
 
 Zuerst gewöhnliche Wasserbewegung beobachten, dann die Ausschläge bei echten Bissen vergleichen. Bei Fehlertreffern den Slider nach links, bei übersehenen Bissen vorsichtig nach rechts bewegen. Die Wasseranpassung kann die wirksame Prozentgrenze weiterhin erhöhen. Einzelbilder und Simulationen belegen keine zuverlässige Erkennung in einer echten Angelsitzung.
 

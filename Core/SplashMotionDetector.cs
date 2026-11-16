@@ -8,6 +8,9 @@ public sealed record SplashAnalysis(PixelFrame Preview, SplashMeasurement Measur
 /// <summary>Consecutive raw-frame differences; one trigger until Reset starts another cast/observation.</summary>
 public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent, bool adaptive, int calibrationMilliseconds)
 {
+    private int _pixelTolerance = pixelTolerance, _minimumPercent = minimumPercent;
+    private readonly int[] _differences = new int[256];
+    private readonly double[] _normalDifferences = new double[256];
     private int[]? _previous;
     private byte[] _changed = [];
     private int[] _queue = [];
@@ -20,15 +23,26 @@ public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent,
     public void Reset()
     {
         _hasPrevious = false; _comparisons = 0; _baseline = 0; _triggered = false;
+        Array.Clear(_normalDifferences);
+    }
+
+    public void UpdateThresholds(int pixelTolerance, int minimumPercent)
+    {
+        if (pixelTolerance is < 1 or > 255 || minimumPercent is < 1 or > 80)
+            throw new ArgumentOutOfRangeException(nameof(pixelTolerance), "Ungültige Einstellungen für den Bildvergleich.");
+        _pixelTolerance = pixelTolerance; _minimumPercent = minimumPercent;
+        // Reevaluate learned water motion for the new noise cutoff without losing elapsed
+        // calibration time, the previous image, or an already delivered trigger.
+        _baseline = NormalChangePercent();
     }
 
     public SplashAnalysis Analyze(PixelFrame frame, DateTimeOffset now, CancellationToken cancellation = default,
-        bool createPreview = true, bool previewOnTrigger = false)
+        bool createPreview = true, bool previewOnTrigger = false, bool latchTrigger = true)
     {
-        if (pixelTolerance is < 1 or > 255 || minimumPercent is < 1 or > 80 || calibrationMilliseconds is < 0 or > 3000)
+        if (_pixelTolerance is < 1 or > 255 || _minimumPercent is < 1 or > 80 || calibrationMilliseconds is < 0 or > 3000)
             throw new ArgumentOutOfRangeException(nameof(pixelTolerance), "Ungültige Einstellungen für den Bildvergleich.");
         if (frame.Width < 1 || frame.Height < 1 || frame.Pixels.Length != checked(frame.Width * frame.Height))
-            throw new ArgumentException("Ungültiger Spritzer-Bildpuffer.");
+            throw new ArgumentException("Ungültiger Biss-Bildpuffer.");
         cancellation.ThrowIfCancellationRequested();
         if (!_hasPrevious || frame.Width != _width || frame.Height != _height)
         {
@@ -37,6 +51,7 @@ public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent,
         }
 
         Array.Clear(_changed);
+        Array.Clear(_differences);
         int changedCount = 0;
         for (int i = 0; i < frame.Pixels.Length; i++)
         {
@@ -44,7 +59,8 @@ public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent,
             int before = _previous![i], after = frame.Pixels[i];
             int difference = Math.Max(Math.Abs(((after >> 16) & 255) - ((before >> 16) & 255)),
                 Math.Max(Math.Abs(((after >> 8) & 255) - ((before >> 8) & 255)), Math.Abs((after & 255) - (before & 255))));
-            if (difference >= pixelTolerance) { _changed[i] = 1; changedCount++; }
+            _differences[difference]++;
+            if (difference >= _pixelTolerance) { _changed[i] = 1; changedCount++; }
         }
         double changedPercent = 100.0 * changedCount / frame.Pixels.Length;
         int largest = changedCount == 0 ? 0 : LargestComponent(cancellation);
@@ -64,16 +80,28 @@ public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent,
         double baseline = _baseline;
         int minimumComponent = Math.Max(4, (int)Math.Ceiling(frame.Pixels.Length * .01));
         bool hit = ready && !_triggered && changedPercent >= threshold && largest >= minimumComponent;
-        if (hit) _triggered = true;
+        if (hit && latchTrigger) _triggered = true;
         // Learn ordinary motion only; avoid teaching the baseline a bite or a large outlier.
-        if (!_triggered && (!ready || changedPercent < threshold))
-            _baseline = _comparisons == 1 ? changedPercent : _baseline + .15 * (changedPercent - _baseline);
+        if (!_triggered && !hit && (!ready || changedPercent < threshold))
+        {
+            double weight = _comparisons == 1 ? 1 : .15;
+            for (int i = 0; i < _normalDifferences.Length; i++)
+                _normalDifferences[i] += weight * (100.0 * _differences[i] / frame.Pixels.Length - _normalDifferences[i]);
+            _baseline = NormalChangePercent();
+        }
         Array.Copy(frame.Pixels, _previous!, frame.Pixels.Length);
         var marked = changedCount > 0 && (createPreview || previewOnTrigger && hit) ? Mark(frame) : frame;
-        return new(marked, new(changedPercent, largestPercent, baseline, threshold, ready, _triggered, hit, false));
+        return new(marked, new(changedPercent, largestPercent, baseline, threshold, ready, _triggered || hit, hit, false));
     }
 
-    private double Threshold() => adaptive ? Math.Min(80, Math.Max(minimumPercent, _baseline * 2.5 + 2)) : minimumPercent;
+    private double NormalChangePercent()
+    {
+        double result = 0;
+        for (int i = _pixelTolerance; i < _normalDifferences.Length; i++) result += _normalDifferences[i];
+        return result;
+    }
+
+    private double Threshold() => adaptive ? Math.Min(80, Math.Max(_minimumPercent, _baseline * 2.5 + 2)) : _minimumPercent;
 
     private SplashMeasurement Measure(double change, double largest, bool ready, bool hit, bool sceneChanged)
         => new(change, largest, _baseline, Threshold(), ready, _triggered, hit, sceneChanged);
@@ -81,6 +109,7 @@ public sealed class SplashMotionDetector(int pixelTolerance, int minimumPercent,
     private void Initialize(PixelFrame frame, DateTimeOffset now)
     {
         _width = frame.Width; _height = frame.Height; _started = now; _comparisons = 0; _baseline = 0;
+        Array.Clear(_normalDifferences);
         if (_previous?.Length != frame.Pixels.Length)
         {
             _previous = new int[frame.Pixels.Length];

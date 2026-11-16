@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace Fish.Core;
 
 /// <summary>Finds at least two distinct, spatially consistent features from the four-part reference.</summary>
@@ -30,7 +32,73 @@ internal sealed class BobberDetector
         if (minimumPercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(minimumPercent));
         if (colorTolerance is < 0 or > 255) throw new ArgumentOutOfRangeException(nameof(colorTolerance));
         cancellation.ThrowIfCancellationRequested();
-        var regions = BobberSegmentation.Find(frame, _profile, cancellation, colorTolerance);
+        var mask = ArrayPool<byte>.Shared.Rent(frame.Pixels.Length);
+        byte[]? structure = null, metalMask = null;
+        byte[] activeMask = mask;
+        try
+        {
+            BobberForeground.Mark(frame, mask, cancellation);
+            BobberMatch? UnderLight(BobberLight? light) => FindRegions(frame,
+                BobberSegmentation.Find(frame, _profile, cancellation, colorTolerance, foregroundOnly: true, foregroundMask: activeMask, light: light, metalMask: metalMask),
+                minimumPercent, cancellation);
+            var local = UnderLight(null);
+            if (IsStrong(local)) return local;
+            // Compare paths rather than accepting the first plausible pair. A tiny fragment or
+            // reflection must not hide a more complete, better fitting bobber elsewhere.
+            var best = Better(local, FindRegions(frame, BobberSegmentation.Find(frame, _profile, cancellation), minimumPercent, cancellation));
+            if (IsStrong(best)) return best;
+            foreach (var light in BobberLighting.Estimate(frame, mask, cancellation))
+            {
+                var corrected = UnderLight(light);
+                best = Better(best, corrected);
+                if (IsStrong(best)) break;
+            }
+            if (!IsStrong(best))
+            {
+                // Bright reflections can join a feather even after a luminance comparison.
+                // Opponent channels remove additive brightness changes from those waves.
+                BobberForeground.Mark(frame, mask, cancellation, chromaticOnly: true);
+                best = Better(best, UnderLight(null));
+                if (!IsStrong(best))
+                    foreach (var light in BobberLighting.Estimate(frame, mask, cancellation))
+                    {
+                        best = Better(best, UnderLight(light));
+                        if (IsStrong(best)) break;
+                    }
+            }
+            if (best == null || best.FeatureCount < 3)
+            {
+                // Keep the eye's fine contour in the original mask while requiring vertical
+                // support for feathers/cork, so horizontal glints cannot join those surfaces.
+                BobberForeground.Mark(frame, mask, cancellation);
+                structure = ArrayPool<byte>.Shared.Rent(frame.Pixels.Length);
+                BobberForeground.SuppressRipples(frame, mask, structure, cancellation);
+                activeMask = structure; metalMask = mask;
+                best = Better(best, UnderLight(null));
+                if (!IsStrong(best))
+                    foreach (var light in BobberLighting.Estimate(frame, mask, cancellation))
+                    {
+                        best = Better(best, UnderLight(light));
+                        if (IsStrong(best)) break;
+                    }
+            }
+            return best;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(mask);
+            if (structure != null) ArrayPool<byte>.Shared.Return(structure);
+        }
+    }
+
+    private static bool IsStrong(BobberMatch? match) => match is { FeatureCount: >= 3, Confidence: >= .94 };
+    private static double Evidence(BobberMatch match) => match.Confidence + .03 * match.FeatureCount +
+        (match.Features.HasFlag(BobberFeatures.Body) ? .01 : 0);
+    private static BobberMatch? Better(BobberMatch? first, BobberMatch? second) =>
+        second != null && (first == null || Evidence(second) > Evidence(first)) ? second : first;
+
+    private BobberMatch? FindRegions(PixelFrame frame, BobberRegions regions, int minimumPercent, CancellationToken cancellation)
+    {
         List<BobberRegion>[] groups = [regions.Bodies, regions.Blue, regions.Red, regions.Metal];
         var bounds = new PixelRect(0, 0, frame.Width, frame.Height);
         BobberMatch? best = null;
@@ -39,6 +107,7 @@ internal sealed class BobberDetector
         foreach (var region in groups[anchor].OrderByDescending(r => r.Count * r.Quality).Take(MaximumCandidatesPerFeature))
         {
             cancellation.ThrowIfCancellationRequested();
+            if (anchor == 0 && region.Density < .45) continue;
             double estimated = Math.Sqrt(region.Bounds.Area / (double)_signatures[anchor].Bounds.Area);
             if (estimated is < .35 or > 2.3) continue;
             foreach (var pose in _poses)
@@ -66,7 +135,7 @@ internal sealed class BobberDetector
                 if (count == 2 && (matches[0] is { Region.Density: < .5 } || !StrongPair(matches))) continue;
                 double score = Score(matches, count);
                 if (score < minimumPercent / 100.0 || best != null &&
-                    (count < best.FeatureCount || count == best.FeatureCount && score <= best.Confidence)) continue;
+                    score + .03 * count + (matches[0] != null ? .01 : 0) <= Evidence(best)) continue;
                 var inferred = matches[0] == null ? FitAnchor(matches, pose.Aspect) : null;
                 if (matches[0] == null && inferred == null) continue;
                 if (inferred is { } fit && !FitsMass(matches, fit.Scale, pose.Aspect, count == 2 ? .2 : .12)) continue;
@@ -91,7 +160,8 @@ internal sealed class BobberDetector
     }
 
     private static bool FitsSize(BobberRegion region, Layout layout, double scale)
-        => region.Bounds.Width >= layout.Width * scale * .4 && region.Bounds.Height >= layout.Height * scale * .4;
+        => region.Bounds.Width >= layout.Width * scale * .45 && region.Bounds.Height >= layout.Height * scale * .45 &&
+            region.Bounds.Width <= layout.Width * scale * 1.65 && region.Bounds.Height <= layout.Height * scale * 1.65;
 
     private bool FitsMass(ReadOnlySpan<FeatureMatch?> matches, double scale, double aspect, double minimum)
     {

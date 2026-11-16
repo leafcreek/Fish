@@ -17,13 +17,13 @@ public sealed class DetectionPreviews : Grid
     public DetectionPreviews()
     {
         ColumnSpacing = RowSpacing = 8;
-        Padding = new(0, 4, 0, 0);
+        Padding = new(0, 4, 0, 10);
         MinHeight = 380;
         ColumnDefinitions.Add(new()); ColumnDefinitions.Add(new());
         RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         RowDefinitions.Add(new() { Height = new(1.4, GridUnitType.Star) });
         AddPreview(0, "Schwimmer", "BobberPreviewImage", 0, 0, 1);
-        AddPreview(1, "Spritzer", "SplashPreviewImage", 0, 1, 1);
+        AddPreview(1, "Biss", "SplashPreviewImage", 0, 1, 1);
         AddPreview(2, "Live", "LivePreviewImage", 1, 0, 2);
     }
 

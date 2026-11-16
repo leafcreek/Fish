@@ -20,7 +20,7 @@ internal sealed class SettingsEditor
         panel.Children.Add(tolerance);
         Sensitivity(tolerance, "Schwimmer", "BobberSensitivity", options.BobberSensitivity,
             value => options.BobberSensitivity = value, changed);
-        Sensitivity(tolerance, "Spritzer", "SplashSensitivity", options.SplashSensitivity,
+        Sensitivity(tolerance, "Biss", "SplashSensitivity", options.SplashSensitivity,
             value => options.SplashSensitivity = value, changed);
         var direction = new Grid();
         direction.Children.Add(new TextBlock { Text = "Gering", FontSize = 11, Foreground = Appearance.Muted,

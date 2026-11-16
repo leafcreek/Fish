@@ -5,6 +5,18 @@ void Check(bool value, string message)
     passed++; Console.WriteLine("PASS " + message);
 }
 string folder = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "tests", Guid.NewGuid().ToString("N"));
+if (args.Contains("--live-sliders"))
+{
+    try
+    {
+        SplashMotionTests.Run(Check);
+        await BotEngineTests.Run(Check, name => name.StartsWith("Live Toleranz") ||
+            name is "Einstellungen während Zweifarben-Bestätigung" or "Splash-Empfindlichkeit live ändern");
+        Console.WriteLine($"{passed} Live-Regler-Prüfungen erfolgreich.");
+    }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
 if (args.Contains("--updates-only"))
 {
     await UpdateTests.Run(Check, folder);
@@ -39,6 +51,18 @@ if (args.Contains("--color-only"))
     Console.WriteLine($"{passed} Farbgruppen-Prüfungen erfolgreich.");
     return;
 }
+if (args.Contains("--bobber-environments"))
+{
+    try
+    {
+        BobberEnvironmentTests.Run(Check);
+        ColorBobberTests.Run(Check, args);
+        BobberColorToleranceTests.Run(Check);
+        Console.WriteLine($"{passed} Schwimmer-Umgebungsprüfungen erfolgreich.");
+    }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
 if (args.Contains("--overlay-only"))
 {
     try
@@ -53,6 +77,7 @@ PreviewBufferTests.Run(Check);
 SplashMotionTests.Run(Check);
 HotkeyTests.Run(Check);
 ReferenceProfileTests.Run(Check);
+BobberEnvironmentTests.Run(Check);
 ColorBobberTests.Run(Check, args);
 BobberColorToleranceTests.Run(Check);
 BobberConfirmationTests.Run(Check);

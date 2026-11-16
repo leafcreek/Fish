@@ -112,6 +112,38 @@ static class SplashMotionTests
         try { noPreview.Analyze(changed, Start.AddSeconds(6), cancelled.Token); }
         catch (OperationCanceledException) { stopped = true; }
         check(stopped, "Splash-Vergleich respektiert Stop vor jeder Auswertung");
+        RunLiveTuning(check);
+    }
+
+    private static void RunLiveTuning(Action<bool, string> check)
+    {
+        var water = Frame(100, 100, 0x405060);
+        var waves = Block(water, 0, 0, 20, 20, 0x586878); // 4% change below the original noise cutoff.
+        var detector = new SplashMotionDetector(50, 5, true, 500);
+        detector.Analyze(water, Start);
+        for (int i = 1; i <= 4; i++) detector.Analyze(i % 2 == 0 ? water : waves, Start.AddMilliseconds(i * 150));
+        detector.UpdateThresholds(20, 1);
+        var result = detector.Analyze(waves, Start.AddMilliseconds(750)).Measurement;
+        check(result.Ready && !result.NewTrigger && result.BaselinePercent == 4 && result.ThresholdPercent == 12,
+            "Neue Rauschtoleranz bewertet gelernte Wasserbewegung sofort neu, ohne Kalibrierung oder Fehlbiss");
+        detector.UpdateThresholds(80, 1);
+        result = detector.Analyze(water, Start.AddMilliseconds(900)).Measurement;
+        check(result.Ready && result.BaselinePercent == 0 && !result.NewTrigger,
+            "Strengere Rauschtoleranz passt die Wasserbasis an und erhält die fertige Kalibrierung");
+
+        var bite = Block(water, 0, 0, 50, 50, 0xffffff);
+        check(detector.Analyze(bite, Start.AddMilliseconds(1050)).Measurement.NewTrigger,
+            "Biss mit neuen Werten wird ohne Wartezeit erkannt");
+        detector.UpdateThresholds(20, 1);
+        check(!detector.Analyze(water, Start.AddMilliseconds(1200)).Measurement.NewTrigger,
+            "Verstellen hebt eine bereits ausgelöste Bisssperre nicht auf");
+
+        detector = new(50, 5, true, 500);
+        detector.Analyze(water, Start); detector.Analyze(water, Start.AddMilliseconds(150));
+        detector.UpdateThresholds(20, 1);
+        detector.Analyze(water, Start.AddMilliseconds(300));
+        check(detector.Analyze(water, Start.AddMilliseconds(600)).Measurement.Ready,
+            "Verstellen während der Kalibrierung erhält die bereits vergangene Zeit");
     }
 
     private static void Warm(SplashMotionDetector detector, PixelFrame frame)

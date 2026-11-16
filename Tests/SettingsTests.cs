@@ -14,7 +14,7 @@ static class SettingsTests
         check(runtime is { CastTimeoutSeconds: 25, BobberTimeoutSeconds: 5, LootDelayMilliseconds: 1000, ScanIntervalMilliseconds: 100 },
             "Feste Angelzeiten stammen ausschließlich aus dem Programm");
         check(runtime.SplashRegion == new SearchRegion(50, 50, 0, 0) && runtime.Motion is { Adaptive: true, CalibrationMilliseconds: 1000 },
-            "Spritzer-Geometrie, Kalibrierung und Wasseranpassung bleiben fest");
+            "Biss-Geometrie, Kalibrierung und Wasseranpassung bleiben fest");
         store.Save(new BotOptions { BobberSensitivity = 400, SplashSensitivity = -1, BobberAreaWidth = 1, BobberAreaHeight = 9999 });
         check(store.Load() is { BobberSensitivity: 100, SplashSensitivity: 0, BobberAreaWidth: 100, BobberAreaHeight: 2160 },
             "Nur veränderbare Werte werden innerhalb ihrer Grenzen normalisiert");

@@ -21,21 +21,23 @@ Fish aktiviert WoW für Eingaben kurz und versucht danach den vorherigen Fenster
 - **Status:** Zeigt den aktuellen Schritt und dessen Zeit. Ein Fund leuchtet kurz grün, ein abgelaufener Suchschritt rot.
 - **Fensterleisten:** Die eigene Titelleiste zeigt das Goldfischsymbol und lässt sich zum Verschieben ziehen. Die schmale Statusleiste unten zeigt die Version des laufenden Builds.
 - **Updates:** Ein Klick auf die Versionsnummer prüft GitHub auf eine neuere Version. Mit **Aktualisieren** wird sie heruntergeladen und geprüft; anschließend beendet Fish das Angeln, speichert die Einstellungen und startet neu. **Später** lässt alles weiterlaufen. Die Prüfung benötigt keine Anmeldung.
-- **Erkennungstoleranz:** Zwei Regler für **Schwimmer** und **Spritzer**. Links ist die Erkennung strenger, rechts toleranter. Änderungen sind auch während einer Sitzung möglich.
-- **Überwachung:** Startet eingeklappt. Aufklappen zeigt Schwimmer und Spritzer nebeneinander sowie ein größeres Livebild darunter. Dabei ändert sich ausschließlich die Fensterhöhe. Breite und die beiden Zielhöhen bleiben fest, auch nach wiederholtem Umschalten.
-- **Suchrahmen:** Petrol markiert den Schwimmerbereich, Gold den Spritzerbereich. Der Spritzerrahmen erscheint erst nach einem Fund, bleibt 50 × 50 Pixel groß und ist durchklickbar.
+- **Erkennungstoleranz:** Zwei Regler für **Schwimmer** und **Biss**. Links ist die Erkennung strenger, rechts toleranter. Änderungen wirken direkt im laufenden Schritt. Wurf, Suchzeit, gefundener Schwimmer und Biss-Kalibrierung bleiben erhalten.
+- **Überwachung:** Startet eingeklappt. Aufklappen zeigt Schwimmer und Biss nebeneinander sowie ein größeres Livebild darunter. Dabei ändert sich ausschließlich die Fensterhöhe. Breite und die beiden Zielhöhen bleiben fest, auch nach wiederholtem Umschalten.
+- **Suchrahmen:** Petrol markiert den Schwimmerbereich, Gold den Bissbereich. Der Bissrahmen erscheint erst nach einem Fund, bleibt 50 × 50 Pixel groß und ist durchklickbar.
 
 Das Fenster bleibt im Vordergrund und verwendet eine helle Oberfläche. Die kompakte Größe beträgt 480 × 400 Pixel bei 100 % Windows-Skalierung. Mit geöffneter Überwachung steigt die Höhe auf bis zu 820 Pixel, begrenzt durch die verfügbare Arbeitsfläche. Manuelles Vergrößern und Maximieren sind gesperrt.
 
 ## Erkennung und Ablauf
 
-Nach dem Auswerfen wartet Fish zwei Sekunden auf das Aufsetzen des Schwimmers. Anschließend stehen volle fünf Sekunden für die Schwimmersuche zur Verfügung. Ein Fund wechselt zur Spritzererkennung; ein Biss löst den Rechtsklick zum Einholen aus. Nach einer Sekunde Wartezeit beginnt der nächste Wurf. Ohne Fund oder Biss wird spätestens nach insgesamt 25 Sekunden neu ausgeworfen.
+Nach dem Auswerfen wartet Fish zwei Sekunden auf das Aufsetzen des Schwimmers. Anschließend stehen volle fünf Sekunden für die Schwimmersuche zur Verfügung. Ein Fund wechselt zur Bisserkennung; ein Biss löst den Rechtsklick zum Einholen aus. Nach einer Sekunde Wartezeit beginnt der nächste Wurf. Ohne Fund oder Biss wird spätestens nach insgesamt 25 Sekunden neu ausgeworfen.
 
-Die Schwimmersuche prüft mindestens zwei räumlich passende Merkmale aus blauer Feder, roter Feder, Körper und Metallöse. Treffer aus genau zwei Merkmalen benötigen drei aufeinanderfolgende Bestätigungen. Die Spritzererkennung vergleicht aufeinanderfolgende Bilder und berücksichtigt normale Wasserbewegung. Eine höhere Toleranz kann zusätzliche Fehlertreffer zulassen.
+Die Schwimmersuche prüft mindestens zwei räumlich passende Merkmale aus blauer Feder, roter Feder, Körper und Metallöse. Treffer aus genau zwei Merkmalen benötigen drei aufeinanderfolgende Bestätigungen. Die Bisserkennung vergleicht aufeinanderfolgende Bilder und berücksichtigt normale Wasserbewegung. Eine höhere Toleranz kann zusätzliche Fehlertreffer zulassen.
+
+Die Schwimmersuche trennt die Merkmale von der lokalen Wasserfarbe. Bei schwierigen Lichtverhältnissen gleicht sie Farbstiche aus und unterdrückt dünne Wellenreflexe, bevor Größe, Form und Anordnung bewertet werden. Das funktioniert ohne Gebietsprofile oder zusätzliche Einstellungen. Die Schwimmer-Toleranz erweitert dabei nur die Materialfarben im getrennten Vordergrund.
 
 Das Farbprofil ist in die EXE eingebettet. Es wird kein zusätzliches Schwimmerbild benötigt. Die tatsächliche Erkennungsqualität und das erfolgreiche Einholen müssen im jeweiligen Zielclient beurteilt werden.
 
-Details: [Angelablauf](docs/fishing-cycle.md) · [Schwimmerprofil](Assets/Detection/README.md) · [Spritzererkennung](docs/splash-motion.md)
+Details: [Angelablauf](docs/fishing-cycle.md) · [Schwimmerprofil](Assets/Detection/README.md) · [Bisserkennung](docs/splash-motion.md)
 
 ## Einstellungen
 
@@ -81,6 +83,12 @@ Gezielte Prüfung der Update-Logik:
 
 ```powershell
 dotnet run --project Tests/Fish.Tests.csproj -c Release -- --updates-only
+```
+
+Für Änderungen an der Schwimmersuche genügen die gezielten Bildprüfungen einschließlich verschiedener Lichtfarben, Helligkeiten, Wasserfarben und Wellenphasen:
+
+```powershell
+dotnet run --project Tests/Fish.Tests.csproj -c Release -- --bobber-environments
 ```
 
 Die Fensterprüfungen laufen separat am veröffentlichten Build:

@@ -17,7 +17,8 @@ internal static class BobberSegmentation
 {
     private const byte Blue = 1, Red = 2, Body = 4, Metal = 8, Visited = 16;
 
-    public static BobberRegions Find(PixelFrame frame, BobberColorProfile profile, CancellationToken cancellation, int colorTolerance = 0)
+    public static BobberRegions Find(PixelFrame frame, BobberColorProfile profile, CancellationToken cancellation, int colorTolerance = 0,
+        bool foregroundOnly = false, byte[]? foregroundMask = null, BobberLight? light = null, byte[]? metalMask = null)
     {
         int length = frame.Pixels.Length;
         var labels = ArrayPool<byte>.Shared.Rent(length);
@@ -26,7 +27,8 @@ internal static class BobberSegmentation
         var queue = ArrayPool<int>.Shared.Rent(length);
         try
         {
-            Classify(frame, profile, labels, quality, cancellation, colorTolerance);
+            if (foregroundOnly && foregroundMask == null) BobberForeground.Mark(frame, supported, cancellation);
+            Classify(frame, profile, labels, quality, cancellation, colorTolerance, foregroundOnly ? foregroundMask ?? supported : null, light, metalMask);
             SupportFeathers(frame, labels, supported, cancellation);
             var blues = Components(frame, supported, quality, queue, Blue, cancellation);
             var reds = Components(frame, supported, quality, queue, Red, cancellation);
@@ -41,24 +43,37 @@ internal static class BobberSegmentation
         }
     }
 
-    private static void Classify(PixelFrame frame, BobberColorProfile profile, byte[] labels, byte[] quality, CancellationToken cancellation, int colorTolerance)
+    private static void Classify(PixelFrame frame, BobberColorProfile profile, byte[] labels, byte[] quality, CancellationToken cancellation, int colorTolerance, byte[]? foreground, BobberLight? light, byte[]? metalMask)
     {
-        var blueMatcher = new BobberColorMatcher(profile.Blue, colorTolerance);
-        var redMatcher = new BobberColorMatcher(profile.Red, colorTolerance);
-        var bodyMatcher = new BobberColorMatcher(profile.Body, colorTolerance);
-        var metalMatcher = new BobberColorMatcher(profile.Metal, colorTolerance);
         for (int y = 0; y < frame.Height; y++)
         {
             cancellation.ThrowIfCancellationRequested();
             int end = (y + 1) * frame.Width;
             for (int i = y * frame.Width; i < end; i++)
             {
+                bool hasForeground = foreground == null || foreground[i] != 0;
+                if (!hasForeground && (metalMask == null || metalMask[i] == 0)) { labels[i] = quality[i] = 0; continue; }
                 int pixel = frame.Pixels[i];
+                if (light is { } correction) pixel = correction.Apply(pixel);
                 var color = HsvColor.FromRgb(pixel);
                 double metal = profile.Metal.Similarity(color);
+                if (foreground != null && metal == 0 && color.Value >= .18 &&
+                    (color.Saturation <= .28 || color.Hue is >= 160 and <= 230 && color.Saturation <= .5))
+                    metal = .85;
                 if (metal > 0) { labels[i] = Metal; quality[i] = (byte)Math.Round(metal * 255); continue; }
-                double blue = blueMatcher.Similarity(pixel, color), red = redMatcher.Similarity(pixel, color), body = bodyMatcher.Similarity(pixel, color);
-                metal = colorTolerance == 0 ? 0 : metalMatcher.Similarity(pixel, color);
+                if (!hasForeground) { labels[i] = quality[i] = 0; continue; }
+                double blue = profile.Blue.Similarity(color), red = profile.Red.Similarity(color), body = profile.Body.Similarity(color);
+                if (foreground != null)
+                {
+                    // These wider material ranges apply only to pixels separated from the local
+                    // water. A greenish cork or dim eye must not require the water to match too.
+                    if (body == 0 && color.Hue >= 20 && color.Hue <= 44 + colorTolerance && color.Saturation is >= .08 and <= .85 && color.Value >= .045)
+                        body = .86;
+                    if (blue == 0 && color.Hue >= 197 - colorTolerance * .65 && color.Hue <= 253 + colorTolerance * .25 && color.Saturation >= .08 && color.Value >= .045)
+                        blue = .84;
+                    if (red == 0 && (color.Hue >= 353 - colorTolerance * .26 || color.Hue <= 29 + colorTolerance * .12) && color.Saturation >= .18 && color.Value >= .045)
+                        red = .84;
+                }
                 double best = Math.Max(metal, Math.Max(blue, Math.Max(red, body)));
                 labels[i] = best == 0 ? (byte)0 : best == metal ? Metal : best == blue ? Blue : best == red ? Red : Body;
                 quality[i] = (byte)Math.Round(best * 255);
@@ -126,7 +141,8 @@ internal static class BobberSegmentation
     private static bool HasMetalOpening(PixelFrame frame, byte[] labels, int[] queue, BobberRegion region)
     {
         var b = region.Bounds;
-        if (b.Width is < 3 or > 80 || b.Height is < 4 or > 100 || region.Density > .85) return false;
+        if (b.Width is < 3 or > 80 || b.Height is < 4 or > 100 || region.Density > .85 ||
+            b.Width / (double)b.Height is < .22 or > 1.05) return false;
         // Flood the background through four-neighbor gaps. A metal eye has an enclosed dark opening
         // and a short stem below it; filled particles, open cursor arcs and ordinary letters fail.
         const byte exterior = 32;

@@ -137,7 +137,7 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
                 return;
         }
         Publish(_phase, _phase == BotState.SearchingBobber ? _confirmation.Activity :
-            _motionReady ? "Bewegung vergleichen" : "Spritzer kalibrieren");
+            _motionReady ? "Bewegung vergleichen" : "Bisserkennung kalibrieren");
         await ScanAsync(cancellation).ConfigureAwait(false);
     }
 
@@ -149,9 +149,12 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
         var area = splash ? _splashArea!.Value : _bobberArea;
         var frame = desktop.Capture(area);
         if (!CanContinueScan(interactionVersion, cancellation)) return;
+        // The raw image is still usable with new thresholds, but never with a changed region.
+        if (ApplyOptions(beforeAnalysis: true)) return;
         var match = splash ? null : owner.Detector.Find(frame, _options.BobberMatchMinimum, cancellation, _options.BobberColorTolerance);
         var analysis = splash ? _motion.Analyze(frame, Now, cancellation,
-            createPreview: owner.HasPreview && owner.LivePreviewEnabled, previewOnTrigger: owner.HasPreview) : null;
+            createPreview: owner.HasPreview && owner.LivePreviewEnabled, previewOnTrigger: owner.HasPreview,
+            latchTrigger: false) : null;
         if (!CanContinueScan(interactionVersion, cancellation)) return;
         // A result from an old region or calibration must never produce an input.
         if (ApplyOptions()) return;
@@ -163,6 +166,7 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
             owner.Preview(analysis?.Preview ?? (match == null ? frame : BobberPreview.Mark(frame, match, confirmed != null)),
                 splash ? PreviewKind.Splash : PreviewKind.Bobber, analysis?.Measurement.NewTrigger ?? confirmed != null);
         if (!CanContinueScan(interactionVersion, cancellation)) return;
+        if (ApplyOptions()) return;
         if (confirmed != null) FoundBobber(area, confirmed);
         else if (analysis != null) await ObserveSplashAsync(analysis.Measurement, cancellation).ConfigureAwait(false);
         else Publish(_phase, _confirmation.Activity);
@@ -176,7 +180,7 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
         _splashArea = _options.SplashRegion.Around(_bobber.Value, _bounds!.Value);
         _confirmation.Reset();
         _motion.Reset(); _motionReady = false; _phase = BotState.Fishing;
-        Publish(_phase, "Spritzer kalibrieren");
+        Publish(_phase, "Bisserkennung kalibrieren");
     }
 
     private async Task ObserveSplashAsync(SplashMeasurement measurement, CancellationToken cancellation)
@@ -233,24 +237,22 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
         return false;
     }
 
-    private bool ApplyOptions()
+    private bool ApplyOptions(bool beforeAnalysis = false)
     {
         if (owner.TakeOptions() is not { } incoming || incoming == _options) return false;
         var old = _options; _options = incoming;
-        bool bobberChanged = old.BobberRegion != incoming.BobberRegion || old.BobberMatchMinimum != incoming.BobberMatchMinimum ||
+        bool regionChanged = old.BobberRegion != incoming.BobberRegion;
+        bool bobberThresholdsChanged = old.BobberMatchMinimum != incoming.BobberMatchMinimum ||
             old.BobberColorTolerance != incoming.BobberColorTolerance;
         bool splashChanged = old.Motion != incoming.Motion;
-        if (splashChanged) _motion = incoming.Motion.CreateDetector();
-        if (bobberChanged)
+        if (splashChanged) _motion.UpdateThresholds(incoming.Motion.PixelTolerance, incoming.Motion.MinimumPercent);
+        if (regionChanged)
         {
             if (_bounds is { } client) _bobberArea = incoming.BobberRegion.In(client);
             ResetObservation(reacquire: true);
         }
-        else if (splashChanged)
-        {
-            _motionReady = false;
-        }
-        return bobberChanged || splashChanged;
+        return regionChanged || !beforeAnalysis &&
+            (_phase == BotState.SearchingBobber && bobberThresholdsChanged || _phase == BotState.Fishing && splashChanged);
     }
 
     private bool HandleTimeout()

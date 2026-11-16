@@ -3,10 +3,11 @@ using Fish.Core;
 
 static class BotEngineTests
 {
-    public static async Task Run(Action<bool, string> check)
+    public static async Task Run(Action<bool, string> check, Predicate<string>? filter = null)
     {
         async Task Exercise(string name, Action<Scenario> arrange, Action<Scenario> verify)
         {
+            if (filter != null && !filter(name)) return;
             using var scenario = new Scenario();
             arrange(scenario);
             try { await scenario.Engine.RunAsync(scenario.Options, scenario.Stop.Token); }
@@ -166,8 +167,8 @@ static class BotEngineTests
                 s.Options.BobberSensitivity = 100; // Must not mutate the published runtime snapshot.
             };
             s.OnUpdate = update => { if (update.State == BotState.Fishing) s.Cancel(); };
-        }, s => check(s.Desktop.Captures.Count == 5 && s.BobberFinds == 1,
-            "Live geänderte Bobber-Empfindlichkeit verwirft alte Bestätigungen und bleibt vom UI-Modell entkoppelt"));
+        }, s => check(s.Desktop.Captures.Count == 3 && s.BobberFinds == 1,
+            "Live geänderte Schwimmer-Toleranz erhält die Bestätigung und wirkt bereits im aufgenommenen Bild"));
 
         await Exercise("Stop während Zweifarben-Bestätigung", s =>
         {
@@ -188,13 +189,64 @@ static class BotEngineTests
         {
             s.Desktop.OnSplashCapture = count =>
             {
-                if (count == 5) { s.Options.SplashSensitivity = 80; s.Engine.UpdateOptions(s.Options); }
-                s.Desktop.EmitSplash = count >= 15;
+                if (count == 9) { s.Options.SplashSensitivity = 90; s.Engine.UpdateOptions(s.Options); }
             };
             s.Desktop.OnLoot = s.Cancel;
         }, s => check(s.Desktop.Loots.Count == 1 && s.Desktop.Keys.Count == 1 && s.BobberFinds == 1 &&
-            s.Desktop.Captures.Count(c => c.Area.Width == 50) == 15,
-            "Splash-Slider kalibriert im laufenden Wurf neu, erhält den Bobber und erkennt danach den Biss"));
+            s.Desktop.Captures.Count(c => c.Area.Width == 50) == 10,
+            "Biss-Toleranz wirkt sofort ohne neue Kalibrierung und erhält Schwimmer und Wurf"));
+
+        await Exercise("Live Toleranz Schwimmer während Bisssuche", s =>
+        {
+            s.Desktop.OnSplashCapture = count =>
+            {
+                if (count == 9) { s.Options.BobberSensitivity = 55; s.Engine.UpdateOptions(s.Options); }
+            };
+            s.Desktop.OnLoot = s.Cancel;
+        }, s => check(s.BobberFinds == 1 && s.Desktop.Keys.Count == 1 && s.Desktop.Loots.Count == 1 &&
+            s.Desktop.Captures.Count(c => c.Area.Width == 50) == 10 &&
+            s.Updates.Where(u => u.State == BotState.Fishing).Select(u => u.Progress!.StartedAt).Distinct().Count() == 1,
+            "Schwimmer-Regler während Bisssuche erhält Fundpunkt, Suchschritt und Fortschrittszeit"));
+
+        await Exercise("Live Toleranz Suchzeit", s =>
+        {
+            s.Desktop.FindBobber = false;
+            s.Desktop.OnBobberCapture = count =>
+            {
+                s.Options.BobberSensitivity = count % 2 == 0 ? 50 : 80; s.Engine.UpdateOptions(s.Options);
+            };
+            s.Desktop.OnKey = _ => { if (s.Desktop.Keys.Count == 2) s.Cancel(); };
+        }, s => check((s.Desktop.Keys[1].At - s.Desktop.Keys[0].At).TotalSeconds is >= 7 and < 7.5 &&
+            s.Updates.Where(u => u.State == BotState.SearchingBobber).Select(u => u.Progress!.StartedAt).Distinct().Count() == 1,
+            "Fortlaufendes Verstellen des Schwimmer-Reglers startet die fünfsekündige Suchzeit nicht neu"));
+
+        await Exercise("Live Toleranz Biss fortlaufend", s =>
+        {
+            s.Desktop.OnSplashCapture = count =>
+            {
+                s.Options.SplashSensitivity = count % 2 == 0 ? 70 : 80; s.Engine.UpdateOptions(s.Options);
+            };
+            s.Desktop.OnLoot = s.Cancel;
+        }, s => check(s.BobberFinds == 1 && s.Desktop.Keys.Count == 1 && s.Desktop.Loots.Count == 1 &&
+            s.Desktop.Captures.Count(c => c.Area.Width == 50) == 10,
+            "Fortlaufendes Verstellen des Biss-Reglers unterbricht weder Kalibrierung noch Erkennung"));
+
+        await Exercise("Live Toleranz während Bissauswertung", s =>
+        {
+            bool changed = false;
+            s.Engine.PreviewAvailable += (_, kind, found) =>
+            {
+                if (changed || kind != PreviewKind.Splash || !found) return;
+                changed = true; s.Options.SplashSensitivity = 0; s.Engine.UpdateOptions(s.Options);
+            };
+            s.Desktop.OnSplashCapture = count =>
+            {
+                s.Desktop.EmitSplash = count != 11;
+                if (count == 12) { s.Options.SplashSensitivity = 100; s.Engine.UpdateOptions(s.Options); }
+            };
+            s.Desktop.OnLoot = s.Cancel;
+        }, s => check(s.Desktop.Loots.Count == 1 && s.Desktop.Captures.Count(c => c.Area.Width == 50) == 12,
+            "Veralteter Biss löst keinen Klick aus und blockiert danach nicht den Treffer mit neuen Werten"));
 
         await Exercise("Hotkey live ändern", s =>
         {

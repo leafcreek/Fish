@@ -1,6 +1,8 @@
 using Fish.Services.Updates;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Fish.Views;
 
@@ -11,6 +13,7 @@ public sealed partial class MainWindow
     private readonly GitHubUpdates _updates = new(UpdateHttp);
     private CancellationTokenSource? _updateCancellation;
     private ContentDialog? _updateDialog;
+    private Flyout? _updateStatusFlyout;
     private UpdateHandoff? _updateHandoff;
     private bool _installingUpdate;
 
@@ -30,7 +33,7 @@ public sealed partial class MainWindow
             if (_closing) return;
             if (release == null)
             {
-                await ShowUpdateDialogAsync("Alles aktuell", "Fish ist aktuell.");
+                ShowCurrentVersion(label);
                 return;
             }
             var content = new StackPanel { Spacing = 12 };
@@ -88,6 +91,40 @@ public sealed partial class MainWindow
                 SessionButton.IsEnabled = !_closing;
             }
         }
+    }
+
+    private void ShowCurrentVersion(string version)
+    {
+        _updateStatusFlyout?.Hide();
+        var content = new Grid { ColumnSpacing = 10 };
+        content.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
+        content.Children.Add(new Border
+        {
+            Width = 32, Height = 32, CornerRadius = new(10), Background = Appearance.AccentSoft,
+            Child = new FontIcon { Glyph = "\uE73E", FontSize = 15, Foreground = Appearance.Running }
+        });
+        var text = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock { Text = "Alles aktuell", FontSize = 13, Foreground = Appearance.Ink,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        text.Children.Add(new TextBlock { Text = "Fish " + version, FontSize = 11, Foreground = Appearance.Muted });
+        Grid.SetColumn(text, 1);
+        content.Children.Add(text);
+        AutomationProperties.SetAutomationId(content, "UpdateStatus");
+        var style = new Style(typeof(FlyoutPresenter));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Appearance.White));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)Application.Current.Resources["FishStroke"]));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        style.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(12)));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12)));
+        style.Setters.Add(new Setter(FrameworkElement.MinWidthProperty, 200d));
+        style.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 260d));
+        _updateStatusFlyout = new Flyout
+        {
+            Content = content, Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.TopEdgeAlignedRight,
+            FlyoutPresenterStyle = style
+        };
+        _updateStatusFlyout.ShowAt(VersionButton);
     }
 
     private async Task<DownloadedUpdate?> DownloadUpdateAsync(UpdateRelease release, CancellationToken cancellation)

@@ -107,6 +107,7 @@ public sealed partial class MainWindow : Window
         _closing = true;
         _updateCancellation?.Cancel();
         _updateDialog?.Hide();
+        _updateStatusFlyout?.Hide();
         _saveTimer?.Stop();
         SessionButton.IsEnabled = false;
         _cancellation?.Cancel();

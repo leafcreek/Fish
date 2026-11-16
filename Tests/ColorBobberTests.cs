@@ -118,27 +118,33 @@ static class ColorBobberTests
         {
             using var sunset = typeof(ColorBobberTests).Assembly.GetManifestResourceStream($"Fish.Tests.{fixture.Item1}")!;
             var sunsetMatch = detector.Find(TestBitmapDecoder.Read(sunset), 80);
-            check(sunsetMatch != null && sunsetMatch.Features.HasFlag(BobberFeatures.Blue | BobberFeatures.Body) && fixture.Item2.Contains(sunsetMatch.Point),
-                $"Sonnenuntergang: Körper und Blau werden trotz mit Wasser verschmolzenem Rot gefunden: {fixture.Item1} · {sunsetMatch}");
+            check(sunsetMatch is { FeatureCount: >= 2 } && fixture.Item2.Contains(sunsetMatch.Point),
+                $"Sonnenuntergang: mindestens zwei getrennte Merkmale trotz Wasserreflexen, mit Klickpunkt im Körper: {fixture.Item1} · {sunsetMatch}");
         }
         using var night = typeof(ColorBobberTests).Assembly.GetManifestResourceStream("Fish.Tests.forever-night.png")!;
         var nightFrame = TestBitmapDecoder.Read(night);
         foreach (int nightMinimum in new[] { 10, 80 })
         {
             var nightMatch = detector.Find(nightFrame, nightMinimum);
-            check(nightMatch is { Features: BobberFeatures.Red | BobberFeatures.Metal, NeedsConfirmation: true } &&
+            check(nightMatch is { FeatureCount: >= 2 } && nightMatch.NeedsConfirmation == (nightMatch.FeatureCount == 2) &&
                 new PixelRect(255, 150, 25, 31).Contains(nightMatch.Point),
-                $"Nacht-Screenshot: Rot + Metall reichen trotz olivem Körper und blauem Wasser bei {nightMinimum} % · {nightMatch}");
+                $"Nacht-Screenshot: getrennte Merkmale trotz olivem Körper und blauem Wasser bei {nightMinimum} % · {nightMatch}");
         }
         using var oldBody = typeof(ColorBobberTests).Assembly.GetManifestResourceStream("Fish.Tests.forever-body.png")!;
+        var bodyWithEye = TestBitmapDecoder.Read(oldBody);
         var bodyOnly = BobberTestImages.Water(240, 180);
-        BobberTestImages.Paste(bodyOnly, TestBitmapDecoder.Read(oldBody), 91, 63);
+        // The historical "body" PNG also contains the metal eye. Remove its top section
+        // so this really tests a single feature rather than a valid body+metal pair.
+        var onlyCork = (int[])bodyWithEye.Pixels.Clone();
+        Array.Clear(onlyCork, 0, bodyWithEye.Width * 29);
+        BobberTestImages.Paste(bodyOnly, new(bodyWithEye.Width, bodyWithEye.Height, onlyCork), 91, 63);
         check(detector.Find(bodyOnly, 10) == null, "Ein reiner Körper ohne zweites Merkmal reicht nicht für einen Treffer");
         var edge = BobberTestImages.Water(220, 180);
         BobberTestImages.Paste(edge, template.Image, 0, 0);
         var edgeMatch = detector.Find(edge, 80)!;
-        check(edgeMatch != null && edgeMatch.Bounds.X == 0 && edgeMatch.Bounds.Y == 0,
-            "Alle drei Farbgruppen werden auch unmittelbar am Rand des Suchbereichs gefunden");
+        check(edgeMatch is { FeatureCount: >= 2 } && Math.Abs(edgeMatch.Point.X - template.Anchor.X) <= 7 &&
+            Math.Abs(edgeMatch.Point.Y - template.Anchor.Y) <= 7,
+            "Der Schwimmer wird auch unmittelbar am Suchbereichsrand mit korrektem Körper-Klickpunkt gefunden");
         var marked = BobberPreview.Mark(edge, edgeMatch!);
         check(!marked.Pixels.SequenceEqual(edge.Pixels) && marked.Pixels[edgeMatch!.Point.Y * edge.Width + edgeMatch.Point.X] == 0x00ff80,
             "Fundmarkierung zeigt den Körper-Klickpunkt und verändert das Rohbild nicht");

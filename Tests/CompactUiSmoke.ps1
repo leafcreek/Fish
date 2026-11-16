@@ -140,7 +140,7 @@ try {
         $labels = Named $label
         if ($labels.Count -ne 1) { throw "Expected one shared endpoint label: $label" }
         if ($labels[0].Current.BoundingRectangle.Top -lt (Element 'SplashSensitivity').Current.BoundingRectangle.Bottom-1) {
-            throw "Endpoint label is not below the Spritzer slider: $label"
+            throw "Endpoint label is not below the Biss slider: $label"
         }
     }
     $low = (Named 'Gering')[0].Current.BoundingRectangle; $high = (Named 'Hoch')[0].Current.BoundingRectangle
@@ -172,7 +172,7 @@ try {
         return ((Named $name) | Where-Object { !$_.Current.IsOffscreen -and $_.Current.BoundingRectangle.Width -gt 0 } |
             Sort-Object { $_.Current.BoundingRectangle.Top } -Descending | Select-Object -First 1).Current.BoundingRectangle
     }
-    $bobber = PreviewHeading 'Schwimmer'; $splash = PreviewHeading 'Spritzer'; $live = PreviewHeading 'Live'
+    $bobber = PreviewHeading 'Schwimmer'; $splash = PreviewHeading 'Biss'; $live = PreviewHeading 'Live'
     $viewport = (Element 'MainScroll').Current.BoundingRectangle
     if ([Math]::Abs($bobber.Top-$splash.Top) -gt 2 -or $bobber.Left -ge $splash.Left -or
         $live.Top -le $bobber.Bottom+60*$scale -or [Math]::Abs($live.Left-$bobber.Left) -gt 2 -or

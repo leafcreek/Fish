@@ -17,7 +17,7 @@ internal static class SessionText
             BotState.WoWNotActive => "WoW wieder einblenden.",
             BotState.Casting => "Der Schwimmer setzt auf.",
             BotState.SearchingBobber => update.Activity.StartsWith("Schwimmer bestätigen") ? "Fund wird geprüft." : "Im markierten Bereich.",
-            BotState.Fishing => update.Activity == "Spritzer kalibrieren" ? "Wasserbewegung kennenlernen." : "Der Schwimmer bleibt im Blick.",
+            BotState.Fishing => update.Activity == "Bisserkennung kalibrieren" ? "Wasserbewegung kennenlernen." : "Der Schwimmer bleibt im Blick.",
             BotState.Looting => "Fang einholen, dann neu auswerfen.",
             BotState.AdjustingArea => "Ziehen oder an der Ecke vergrößern.",
             BotState.Idle => "Gleich geht’s weiter.",

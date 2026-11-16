@@ -22,7 +22,7 @@ try {
         $message = $null
         for ($attempt=0; $attempt -lt 80; $attempt++) {
             $message = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
-                [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Fish ist aktuell.'))
+                [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Alles aktuell'))
             if ($message) { break }
             Start-Sleep -Milliseconds 200
         }

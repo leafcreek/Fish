@@ -99,7 +99,7 @@ static class OverlayDesktopTests
             });
             check(new SearchRegion(options.BobberAreaWidth, options.BobberAreaHeight, options.BobberAreaXOffset, options.BobberAreaYOffset) == saved &&
                 !overlays.IsEditing, "Eine bewegte Spielfläche bricht die Griffbearbeitung ohne falsche Versätze ab");
-            check(FindHandle("Spritzer-Bereich verschieben") == 0, "Ohne Schwimmer gibt es keine Spritzer-Griffe");
+            check(FindHandle("Biss-Bereich verschieben") == 0, "Ohne Schwimmer gibt es keine Biss-Griffe");
             client = GameWindow.Bounds(window.Handle)!.Value;
             var bobber = new PixelPoint(client.X + client.Width / 2 + 60, client.Y + client.Height / 2);
             BotUpdate FishingUpdate() => new(BotState.Fishing, "Test", saved.In(client),
@@ -107,17 +107,17 @@ static class OverlayDesktopTests
                 window.Handle, bobber);
             overlays.Update(options, FishingUpdate(), true); Pump();
             nint splashFrame = FindFrame(FishingUpdate().SplashArea!.Value);
-            check(splashFrame != 0, "Gefundener Schwimmer zeigt weiterhin den Spritzer-Rahmen");
-            check(FindHandle("Spritzer-Bereich verschieben") == 0 && FindHandle("Spritzer-Bereich skalieren") == 0,
-                "Auch der sichtbare Spritzer-Rahmen besitzt keine Mausgriffe mehr");
+            check(splashFrame != 0, "Gefundener Schwimmer zeigt weiterhin den Biss-Rahmen");
+            check(FindHandle("Biss-Bereich verschieben") == 0 && FindHandle("Biss-Bereich skalieren") == 0,
+                "Auch der sichtbare Biss-Rahmen besitzt keine Mausgriffe mehr");
             check((GetWindowLongW(splashFrame, -20) & 0x08000020) == 0x08000020,
-                "Spritzer-Rahmen bleibt durchklickbar und übernimmt keinen Fokus");
+                "Biss-Rahmen bleibt durchklickbar und übernimmt keinen Fokus");
             int editsBefore = editing.Count;
             overlays.Update(options, FishingUpdate(), true); Pump();
             check(FishingUpdate().SplashArea is { Width: 50, Height: 50 } && FindFrame(FishingUpdate().SplashArea!.Value) == splashFrame &&
-                !overlays.IsEditing && editing.Count == editsBefore, "Spritzer-Rahmen bleibt unveränderlich 50 × 50 und mittig am Bobber");
+                !overlays.IsEditing && editing.Count == editsBefore, "Biss-Rahmen bleibt unveränderlich 50 × 50 und mittig am Bobber");
             overlays.Update(options, null, false); Pump();
-            check(!Desktop.IsWindowVisible(splashFrame), "Stop versteckt den Spritzer-Rahmen");
+            check(!Desktop.IsWindowVisible(splashFrame), "Stop versteckt den Biss-Rahmen");
             check(errors.Count == 0, "Native Mausbehandlung wirft keine Fensterprozedurfehler");
         }
         finally

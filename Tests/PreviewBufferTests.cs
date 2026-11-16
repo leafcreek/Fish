@@ -24,6 +24,6 @@ static class PreviewBufferTests
         previewBuffer.Add(new(2, 1, [0xffffff, 0]), PreviewKind.Splash, true);
         previewBuffer.ClearLive();
         var paused = previewBuffer.Take();
-        check(paused.Live == null && paused.Splash != null, "Verbergen der Liveansicht behält das Spritzer-Fundbild ohne Messwerttransport");
+        check(paused.Live == null && paused.Splash != null, "Verbergen der Liveansicht behält das Biss-Fundbild ohne Messwerttransport");
     }
 }
