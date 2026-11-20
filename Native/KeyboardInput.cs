@@ -17,7 +17,7 @@ internal static class KeyboardInput
     [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
 
-    // Avoid changing a combination while the user is holding a modifier or the cast key.
+    // Avoid sending a combination while the user is holding a modifier or the target key.
     internal static bool UserIsTyping(FishingHotkey hotkey)
     {
         if ((GetAsyncKeyState(hotkey.Key) & 0x8000) != 0) return true;
@@ -38,7 +38,7 @@ internal static class KeyboardInput
         int error = Marshal.GetLastWin32Error();
         var release = keys.Reverse().Select(key => Key(key, true)).ToArray();
         SendInput((uint)release.Length, release, Marshal.SizeOf<Input>());
-        throw new Win32Exception(error, "Der Angeln-Hotkey konnte nicht vollständig gesendet werden.");
+        throw new Win32Exception(error, $"Die Taste {hotkey.DisplayName} konnte nicht vollständig gesendet werden.");
     }
     private static bool IsExtended(int key) => key is >= 0x21 and <= 0x2e or 0x6f;
 }

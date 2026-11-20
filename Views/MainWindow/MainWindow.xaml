@@ -55,20 +55,32 @@
                         <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon x:Name="SessionButtonIcon" Width="11" Height="11" Data="M 1,0 L 11,6 L 1,12 Z" /><TextBlock x:Name="SessionButtonText" Text="Starten" FontSize="13" /></StackPanel>
                     </Button>
                 </Grid>
-                <Border x:Name="StepProgressPanel" Grid.Row="1" CornerRadius="6" Padding="4,2" Margin="-4,0">
-                    <Border.BackgroundTransition><BrushTransition Duration="0:0:0.167" /></Border.BackgroundTransition>
-                    <Grid RowSpacing="5">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <StackPanel Grid.Row="1" Spacing="5">
+                    <Border x:Name="StepProgressPanel" CornerRadius="6" Padding="4,2" Margin="-4,0">
+                        <Border.BackgroundTransition><BrushTransition Duration="0:0:0.167" /></Border.BackgroundTransition>
+                        <Grid RowSpacing="5">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock x:Name="StepCaption" Text="Nächster Wurf" FontSize="11" Foreground="{StaticResource FishMuted}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="StepTimeText" Grid.Column="1" Text="0,0 / 0,0 s" FontSize="11" Foreground="{StaticResource FishMuted}" AutomationProperties.AutomationId="StepTimeText" />
+                            </Grid>
+                            <ProgressBar x:Name="StepTimeProgress" Grid.Row="1" Minimum="0" Maximum="1" Value="0" Height="8" MinHeight="8" CornerRadius="4" Background="{StaticResource FishTrack}" IsIndeterminate="False" AutomationProperties.Name="Schrittfortschritt" AutomationProperties.AutomationId="StepTimeProgress">
+                                <ProgressBar.Resources><x:Double x:Key="ProgressBarTrackHeight">8</x:Double></ProgressBar.Resources>
+                            </ProgressBar>
+                        </Grid>
+                    </Border>
+                    <StackPanel Spacing="5">
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock x:Name="StepCaption" Text="Nächster Wurf" FontSize="11" Foreground="{StaticResource FishMuted}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="StepTimeText" Grid.Column="1" Text="0,0 / 0,0 s" FontSize="11" Foreground="{StaticResource FishMuted}" AutomationProperties.AutomationId="StepTimeText" />
+                            <TextBlock Text="Köder" FontSize="11" Foreground="{StaticResource FishMuted}" />
+                            <TextBlock x:Name="BaitTimeText" Grid.Column="1" Text="Deaktiviert" FontSize="11" Foreground="{StaticResource FishMuted}" AutomationProperties.AutomationId="BaitTimeText" />
                         </Grid>
-                        <ProgressBar x:Name="StepTimeProgress" Grid.Row="1" Minimum="0" Maximum="1" Value="0" Height="8" MinHeight="8" CornerRadius="4" Background="{StaticResource FishTrack}" IsIndeterminate="False" AutomationProperties.Name="Schrittfortschritt" AutomationProperties.AutomationId="StepTimeProgress">
+                        <ProgressBar x:Name="BaitTimeProgress" Minimum="0" Maximum="1" Value="0" Height="8" MinHeight="8" CornerRadius="4" Foreground="{StaticResource FishAmber}" Background="{StaticResource FishTrack}" AutomationProperties.Name="Köder-Restzeit" AutomationProperties.AutomationId="BaitTimeProgress">
                             <ProgressBar.Resources><x:Double x:Key="ProgressBarTrackHeight">8</x:Double></ProgressBar.Resources>
                         </ProgressBar>
-                    </Grid>
-                </Border>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
         <ScrollViewer x:Name="MainScroll" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">

@@ -22,10 +22,10 @@ try {
     if (!$app.WaitForExit(10000) -or $app.ExitCode -ne 0) { throw 'Default Fish did not close cleanly.' }
     if (!(Test-Path -LiteralPath $target)) { throw 'LocalAppData settings.json was not created.' }
     $saved = Get-Content -LiteralPath $target -Raw | ConvertFrom-Json
-    $allowed = @('SchemaVersion','FishingHotkey','WindowXPosition','WindowYPosition','BobberAreaWidth','BobberAreaHeight','BobberAreaXOffset','BobberAreaYOffset','BobberSensitivity','SplashSensitivity')
+    $allowed = @('SchemaVersion','FishingHotkey','BaitEnabled','BaitHotkey','BaitFiveMinutes','WindowXPosition','WindowYPosition','BobberAreaWidth','BobberAreaHeight','BobberAreaXOffset','BobberAreaYOffset','BobberSensitivity','SplashSensitivity')
     if ($saved.SchemaVersion -ne 7 -or @($saved.PSObject.Properties.Name | Where-Object { $_ -notin $allowed }).Count -ne 0) { throw 'Removed settings remain in the real configuration.' }
     if ($previous) {
-        foreach ($name in @('FishingHotkey','BobberAreaWidth','BobberAreaHeight','BobberAreaXOffset','BobberAreaYOffset')) {
+        foreach ($name in @('FishingHotkey','BaitEnabled','BaitHotkey','BaitFiveMinutes','BobberAreaWidth','BobberAreaHeight','BobberAreaXOffset','BobberAreaYOffset')) {
             if ($previous.PSObject.Properties.Name -contains $name -and $saved.$name -ne $previous.$name) { throw "User setting was not preserved: $name" }
         }
     }

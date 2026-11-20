@@ -8,6 +8,7 @@ internal static class SessionText
     {
         if (update.Activity.Contains("außerhalb")) return "Suchbereich ins WoW-Fenster ziehen.";
         if (update.Activity.StartsWith("Wurf konnte")) return "Angeltaste prüfen. Neuer Versuch.";
+        if (update.Activity.StartsWith("Ködertaste konnte")) return "Ködertaste prüfen. Neuer Versuch.";
         if (update.Activity.Contains("fehlgeschlagen")) return "Einholen fehlgeschlagen. Neuer Versuch.";
         if (update.Activity.StartsWith("Bildwechsel")) return "Bild geändert. Suche beginnt neu.";
         if (update.Activity.StartsWith("Timeout")) return "Zeit abgelaufen. Neuer Wurf.";
@@ -15,6 +16,7 @@ internal static class SessionText
         {
             BotState.WoWNotRunning => "WoW öffnen, dann geht’s weiter.",
             BotState.WoWNotActive => "WoW wieder einblenden.",
+            BotState.ApplyingBait => "Danach wird ausgeworfen.",
             BotState.Casting => "Der Schwimmer setzt auf.",
             BotState.SearchingBobber => update.Activity.StartsWith("Schwimmer bestätigen") ? "Fund wird geprüft." : "Im markierten Bereich.",
             BotState.Fishing => update.Activity == "Bisserkennung kalibrieren" ? "Wasserbewegung kennenlernen." : "Der Schwimmer bleibt im Blick.",

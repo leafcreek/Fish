@@ -7,8 +7,12 @@ public sealed class BotOptions
     public const int CurrentSchemaVersion = 7;
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string FishingHotkey { get; set; } = "1";
+    public bool BaitEnabled { get; set; }
+    public bool BaitFiveMinutes { get; set; }
+    public string BaitHotkey { get; set; } = "2";
+    internal TimeSpan BaitDuration => TimeSpan.FromMinutes(BaitFiveMinutes ? 5 : 10);
     public const int MinimumWindowWidth = 400, MinimumWindowHeight = 360;
-    public const int DefaultWindowWidth = 480, DefaultWindowHeight = 400;
+    public const int DefaultWindowWidth = 480, DefaultWindowHeight = 480;
     public int WindowXPosition { get; set; }
     public int WindowYPosition { get; set; }
     public int BobberAreaWidth { get; set; } = 600;
@@ -23,6 +27,7 @@ public sealed class BotOptions
     public void Normalize()
     {
         FishingHotkey = Core.FishingHotkey.TryParse(FishingHotkey, out var hotkey) ? hotkey.ToString() : "1";
+        BaitHotkey = Core.FishingHotkey.TryParse(BaitHotkey, out var baitHotkey) ? baitHotkey.ToString() : "2";
         BobberAreaWidth = Math.Clamp(BobberAreaWidth, 100, 3840);
         BobberAreaHeight = Math.Clamp(BobberAreaHeight, 100, 2160);
         BobberAreaXOffset = Math.Clamp(BobberAreaXOffset, -7680, 7680);

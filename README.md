@@ -19,13 +19,14 @@ Fish aktiviert WoW für Eingaben kurz und versucht danach den vorherigen Fenster
 ## Bedienung
 
 - **Status:** Zeigt den aktuellen Schritt und dessen Zeit. Ein Fund leuchtet kurz grün, ein abgelaufener Suchschritt rot.
+- **Köder:** Bei aktivierter Option sendet Fish die Ködertaste (Standard `2`) vor dem Auswurf, wenn der Timer leer ist. Der normale Fortschrittsbalken zeigt die fünf Sekunden zum Anbringen. Danach läuft die Wirkzeit im zweiten Balken rückwärts, auch bei gestopptem Angeln. Der Button **5 min** oder **10 min** zeigt die gewählte Wirkzeit und schaltet sie per Klick um. Standardmäßig gelten zehn Minuten. **Makro** kopiert das WoW-Makro in die Zwischenablage. **▶** startet die gewählte Wirkzeit manuell, **■** stoppt sie. Beim Neustart von Fish beginnt die Restzeit leer.
 - **Fensterleisten:** Die eigene Titelleiste zeigt das Goldfischsymbol und lässt sich zum Verschieben ziehen. Die schmale Statusleiste unten zeigt die Version des laufenden Builds.
 - **Updates:** Ein Klick auf die Versionsnummer prüft GitHub auf eine neuere Version. Mit **Aktualisieren** wird sie heruntergeladen und geprüft; anschließend beendet Fish das Angeln, speichert die Einstellungen und startet neu. **Später** lässt alles weiterlaufen. Die Prüfung benötigt keine Anmeldung.
 - **Erkennungstoleranz:** Zwei Regler für **Schwimmer** und **Biss**. Links ist die Erkennung strenger, rechts toleranter. Änderungen wirken direkt im laufenden Schritt. Wurf, Suchzeit, gefundener Schwimmer und Biss-Kalibrierung bleiben erhalten.
 - **Überwachung:** Startet eingeklappt. Aufklappen zeigt Schwimmer und Biss nebeneinander sowie ein größeres Livebild darunter. Dabei ändert sich ausschließlich die Fensterhöhe. Breite und die beiden Zielhöhen bleiben fest, auch nach wiederholtem Umschalten.
 - **Suchrahmen:** Petrol markiert den Schwimmerbereich, Gold den Bissbereich. Der Bissrahmen erscheint erst nach einem Fund, bleibt 50 × 50 Pixel groß und ist durchklickbar.
 
-Das Fenster bleibt im Vordergrund und verwendet eine helle Oberfläche. Die kompakte Größe beträgt 480 × 400 Pixel bei 100 % Windows-Skalierung. Mit geöffneter Überwachung steigt die Höhe auf bis zu 820 Pixel, begrenzt durch die verfügbare Arbeitsfläche. Manuelles Vergrößern und Maximieren sind gesperrt.
+Das Fenster bleibt im Vordergrund und verwendet eine helle Oberfläche. Die kompakte Größe beträgt 480 × 480 Pixel bei 100 % Windows-Skalierung. Mit geöffneter Überwachung steigt die Höhe auf bis zu 820 Pixel, begrenzt durch die verfügbare Arbeitsfläche. Manuelles Vergrößern und Maximieren sind gesperrt.
 
 ## Erkennung und Ablauf
 
@@ -47,7 +48,7 @@ Fish speichert automatisch unter:
 %LOCALAPPDATA%\Fish\settings.json
 ```
 
-Gespeichert werden nur Angeltaste, beide Toleranzregler, Schwimmerbereich und Fensterposition sowie die Formatversion. Feste Zeiten, Fenstermaße, DPI und frühere Einzelregler werden nicht mehr gespeichert.
+Gespeichert werden Angeltaste, Köderoption, Ködertaste, gewählte Wirkzeit, beide Toleranzregler, Schwimmerbereich, Fensterposition und Formatversion. Die Köder-Restzeit lebt bis zum Schließen von Fish im Arbeitsspeicher. Feste Zeiten und Fenstermaße sind im Programm vorgegeben.
 
 - Eine vorhandene `appsettings.json` neben der EXE wird einmalig übernommen, wenn am neuen Speicherort weder Hauptdatei noch Sicherung existiert. Die alten Dateien bleiben unverändert.
 - Frühere individuelle Einzelwerte werden auf die nächstpassende heutige Reglerstellung übertragen. Bei den Standard-Basiswerten bleiben die Stellungen unverändert.

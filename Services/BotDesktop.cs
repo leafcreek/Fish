@@ -18,7 +18,7 @@ public sealed class BotDesktop : IBotDesktop, IDisposable
         if (previous != 0 && previous != game && Desktop.GetForegroundWindow() == game && Desktop.IsWindow(previous))
             Desktop.SetForegroundWindow(previous);
     }
-    public async Task<bool> CastAsync(nint game, FishingHotkey hotkey, PixelRect expectedBounds, CancellationToken cancellation)
+    public async Task<bool> SendHotkeyAsync(nint game, FishingHotkey hotkey, PixelRect expectedBounds, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
         if (!CanInput(game, expectedBounds) || KeyboardInput.UserIsTyping(hotkey)) return false;

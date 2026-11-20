@@ -5,6 +5,13 @@ void Check(bool value, string message)
     passed++; Console.WriteLine("PASS " + message);
 }
 string folder = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "tests", Guid.NewGuid().ToString("N"));
+if (args.Contains("--bait-only"))
+{
+    SettingsTests.Run(Check, folder);
+    await BotEngineTests.Run(Check, name => name.StartsWith("Köder", StringComparison.Ordinal));
+    Console.WriteLine($"{passed} Köder- und Einstellungsprüfungen erfolgreich.");
+    return;
+}
 if (args.Contains("--live-sliders"))
 {
     try

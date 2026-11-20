@@ -211,17 +211,18 @@ try {
         if ($window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition)) { throw "Removed setting remains visible: $removedName" }
     }
     Write-Output 'PASS combined view has no tabs; hotkey and detection thresholds remain directly accessible'
-    function Commit-Settings {
-        # Moving focus commits the hotkey without changing the shared view.
-        $start.SetFocus()
-    }
     Start-Sleep -Milliseconds 300
     $hotkeyInput = Find-Element 'FishingHotkey' -ById
-    if (!$hotkeyInput.Current.IsEnabled) { throw 'Fishing hotkey cannot be edited while active.' }
-    $hotkeyInput.SetFocus()
-    $hotkeyInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('Ctrl+F8')
+    $baitInput = Find-Element 'BaitHotkey' -ById
+    $expectedFishingHotkey = '1'
+    $expectedBaitHotkey = '2'
+    foreach ($hotkeyDisplay in @($hotkeyInput, $baitInput)) {
+        if ($hotkeyDisplay.Current.ControlType -ne [System.Windows.Automation.ControlType]::Text -or
+            $hotkeyDisplay.Current.IsKeyboardFocusable) {
+            throw 'Both hotkeys should be static text with no keyboard focus.'
+        }
+    }
     if ($NativeInput) {
-        $hotkeyInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('Shift+F6')
         $captureHotkey = Find-Element 'CaptureFishingHotkey' -ById
         $captureHotkey.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         $captureHotkey.SetFocus()
@@ -229,14 +230,23 @@ try {
         Start-Sleep -Milliseconds 200
         [FishSmokeNative]::TapKey($mainHandle, 0x77, $true)
         Start-Sleep -Milliseconds 300
-        if ($hotkeyInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'Ctrl+F8') { throw 'Hotkey capture did not record Ctrl+F8.' }
+        $expectedFishingHotkey = 'Ctrl+F8'
+        if ($hotkeyInput.Current.Name -ne $expectedFishingHotkey) { throw 'Hotkey capture did not record Ctrl+F8.' }
         $captureHotkey.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         Start-Sleep -Milliseconds 150
         [FishSmokeNative]::TapKey($mainHandle, 0x1b, $false)
         [FishSmokeNative]::TapKey($mainHandle, 0x51, $false)
         Start-Sleep -Milliseconds 300
-        if ($hotkeyInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'Ctrl+F8') { throw 'Escape did not cancel hotkey capture.' }
-        Write-Output 'PASS recording Ctrl+F8 and cancelling capture with Escape'
+        if ($hotkeyInput.Current.Name -ne $expectedFishingHotkey) { throw 'Escape did not cancel hotkey capture.' }
+        $captureBait = Find-Element 'CaptureBaitHotkey' -ById
+        $captureBait.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        $captureBait.SetFocus()
+        Start-Sleep -Milliseconds 150
+        [FishSmokeNative]::TapKey($mainHandle, 0x75, $false)
+        Start-Sleep -Milliseconds 300
+        $expectedBaitHotkey = 'F6'
+        if ($baitInput.Current.Name -ne $expectedBaitHotkey) { throw 'Bait hotkey capture did not record F6.' }
+        Write-Output 'PASS Setzen records fishing and bait hotkeys; Escape cancels capture'
     }
     $bobber = Find-Element 'BobberSensitivity' -ById
     $splash = Find-Element 'SplashSensitivity' -ById
@@ -248,7 +258,6 @@ try {
     $splashRange = $splash.GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern)
     $bobberRange.SetValue(70)
     $splashRange.SetValue(80)
-    Commit-Settings
     Write-Output 'PASS two independent sensitivity sliders, range 0-100, midpoint 50; no individual detection inputs'
     if ($NativeOverlay) {
         . (Join-Path $PSScriptRoot 'SettingsOverlaySmoke.ps1')
@@ -267,10 +276,8 @@ try {
     if ($liveSettingsTest) {
         # Exercise repeated live sensitivity changes without stopping the session.
         $bobberRange.SetValue(40)
-        Commit-Settings
         Start-Sleep -Milliseconds 300
         $bobberRange.SetValue(70)
-        Commit-Settings
         Start-Sleep -Milliseconds 300
         if ($start.Current.Name -ne 'Stoppen') { throw 'Editing settings stopped the active session.' }
         Write-Output 'PASS detection and action settings editable during an active session'
@@ -287,7 +294,9 @@ try {
     if (!(Test-Path -LiteralPath $settingsFile)) { throw 'Settings were not saved on close.' }
     $saved = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
     if ($NativeOverlay -and ($saved.BobberAreaWidth -eq 600 -or $saved.BobberAreaHeight -eq 300 -or $saved.BobberAreaXOffset -eq 0 -or $saved.BobberAreaYOffset -eq 0)) { throw 'Edited bobber geometry was not saved.' }
-    if ($saved.FishingHotkey -ne 'Ctrl+F8' -or $saved.SchemaVersion -ne 7) { throw 'Fishing hotkey or settings version was not saved.' }
+    if ($saved.FishingHotkey -ne $expectedFishingHotkey -or $saved.BaitHotkey -ne $expectedBaitHotkey -or $saved.SchemaVersion -ne 7) {
+        throw 'Hotkeys or settings version were not saved.'
+    }
     if ($saved.BobberSensitivity -ne 70 -or $saved.SplashSensitivity -ne 80) { throw 'Sensitivity sliders were not saved.' }
     foreach ($removedProperty in @('Theme','AlwaysOnTop','MinimizeToTray','CloseToTray','CastTimeoutSeconds','BobberTimeoutSeconds',
         'LootDelayMilliseconds','ScanIntervalMilliseconds','SplashAreaWidth','SplashAreaHeight','SplashAreaXOffset','SplashAreaYOffset',
@@ -301,8 +310,12 @@ try {
     $window = Wait-FishWindow $process
     $mainHandle = [FishUiWindow]::Find($process.Id)
     Start-Sleep -Milliseconds 1000
-    $hotkeyInput = Find-Element 'FishingHotkey' -ById
-    if ($hotkeyInput.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -ne 'Ctrl+F8') { throw 'Fishing hotkey was not restored.' }
+    foreach ($item in @(@('FishingHotkey',$expectedFishingHotkey),@('BaitHotkey',$expectedBaitHotkey))) {
+        $hotkeyInput = Find-Element $item[0] -ById
+        if ($hotkeyInput.Current.Name -ne $item[1]) {
+            throw "Hotkey was not restored: $($item[0])"
+        }
+    }
     Start-Sleep -Milliseconds 300
     foreach ($item in @(@('BobberSensitivity',70),@('SplashSensitivity',80))) {
         $slider = Find-Element $item[0] -ById

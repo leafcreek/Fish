@@ -3,7 +3,7 @@ using Fish.Configuration;
 namespace Fish.Core;
 
 /// <summary>Session lifecycle and atomic configuration handoff. Each run owns its fishing state.</summary>
-public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = null)
+public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = null, BaitCountdown? baitCountdown = null)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly Lazy<BobberDetector> _detector = new(() => new());
@@ -29,6 +29,7 @@ public sealed class BotEngine(IBotDesktop desktop, TimeProvider? timeProvider = 
         lock (_lifecycle) { if (_running) Interlocked.Exchange(ref _pendingOptions, options); }
     }
     internal FishingOptions? TakeOptions() => Interlocked.Exchange(ref _pendingOptions, null);
+    internal BaitCountdown BaitCountdown { get; } = baitCountdown ?? new(timeProvider);
     internal BobberDetector Detector => _detector.Value;
     internal bool HasPreview => PreviewAvailable != null;
     internal bool LivePreviewEnabled => Volatile.Read(ref _livePreviewEnabled) != 0;

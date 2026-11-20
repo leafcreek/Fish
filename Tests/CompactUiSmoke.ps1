@@ -89,8 +89,8 @@ try {
     }
     $scale = [FishCompactWindow]::GetDpiForWindow($handle) / 96.0
     $compact = Bounds
-    if ([Math]::Abs(($compact.Right-$compact.Left)-480*$scale) -gt 2 -or [Math]::Abs(($compact.Bottom-$compact.Top)-400*$scale) -gt 2) {
-        throw 'Saved dimensions overrode the fixed 480x400 startup layout.'
+    if ([Math]::Abs(($compact.Right-$compact.Left)-480*$scale) -gt 2 -or [Math]::Abs(($compact.Bottom-$compact.Top)-480*$scale) -gt 2) {
+        throw 'Saved dimensions overrode the fixed 480x480 startup layout.'
     }
     $window = $root.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
     if ($window.Current.CanMaximize -or ([FishCompactWindow]::GetWindowLongW($handle,-16) -band 0x00040000) -ne 0) {
@@ -102,7 +102,7 @@ try {
     foreach ($icon in @(0,1)) {
         if ([FishCompactWindow]::SendMessageW($handle,0x7f,[IntPtr]::new($icon),[IntPtr]::Zero) -eq [IntPtr]::Zero) { throw 'Goldfish icon is missing.' }
     }
-    Write-Output 'PASS fixed 480x400 startup; resize and maximize disabled; monitoring collapsed; goldfish icons present'
+    Write-Output 'PASS fixed 480x480 startup; resize and maximize disabled; monitoring collapsed; goldfish icons present'
     $titleBar = Element 'AppTitleBar'
     $version = Element 'VersionText'
     $expectedVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($launch.FilePath).ProductVersion.Split('+')[0]
@@ -131,7 +131,7 @@ try {
         [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Slider))
     $edits = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,
         [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Edit))
-    if ($sliders.Count -ne 2 -or $edits.Count -ne 1) { throw 'Expected two sliders and the hotkey input only.' }
+    if ($sliders.Count -ne 2 -or $edits.Count -ne 0) { throw 'Expected two sliders and display-only hotkeys.' }
     $viewport = (Element 'MainScroll').Current.BoundingRectangle
     foreach ($id in @('BobberSensitivity','SplashSensitivity')) {
         if ((Element $id).Current.BoundingRectangle.Width -lt $viewport.Width-36*$scale) { throw "Slider is not full width: $id" }
@@ -153,8 +153,98 @@ try {
             throw "Removed footer status remains: $id"
         }
     }
-    if ((Element 'FishingHotkey').Current.BoundingRectangle.Width -gt 100*$scale) { throw 'Hotkey input is still too wide.' }
+    $fishingHotkey = Element 'FishingHotkey'
+    if ($fishingHotkey.Current.BoundingRectangle.Width -gt 100*$scale) { throw 'Hotkey input is still too wide.' }
     if ($monitor.Current.IsOffscreen -or $monitor.Current.BoundingRectangle.Bottom -gt $viewport.Bottom+1) { throw 'Monitoring header is clipped.' }
+    $baitCheckbox = Element 'BaitEnabled'
+    $baitLabel = Element 'BaitSettingLabel'
+    $durationButton = Element 'BaitFiveMinutes'
+    $macroButton = Element 'CopyBaitMacro'
+    $timerButton = Element 'BaitTimerToggle'
+    $baitHotkey = Element 'BaitHotkey'
+    $baitToggle = $baitCheckbox.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+    $durationAction = $durationButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    $baitProgress = Element 'BaitTimeProgress'
+    $baitTime = Element 'BaitTimeText'
+    $baitRange = $baitProgress.GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern)
+    foreach ($hotkey in @($fishingHotkey, $baitHotkey)) {
+        if ($hotkey.Current.ControlType -ne [System.Windows.Automation.ControlType]::Text -or
+            $hotkey.Current.IsKeyboardFocusable) {
+            throw 'Both hotkeys should be static text with no keyboard focus.'
+        }
+    }
+    if ($fishingHotkey.Current.Name -ne '1' -or $baitHotkey.Current.Name -ne '2') {
+        throw 'The displays should show the default hotkeys.'
+    }
+    if ($baitLabel.Current.ControlType -ne [System.Windows.Automation.ControlType]::Text) {
+        throw 'Expected a standalone bait label.'
+    }
+    $labelBounds = $baitLabel.Current.BoundingRectangle
+    $checkboxBounds = $baitCheckbox.Current.BoundingRectangle
+    if ($checkboxBounds.Right -gt $labelBounds.Left -or
+        [Math]::Abs(($labelBounds.Top+$labelBounds.Bottom)-($checkboxBounds.Top+$checkboxBounds.Bottom)) -gt 4*$scale) {
+        throw 'Bait label should be centered next to its checkbox.'
+    }
+    if ($baitToggle.Current.ToggleState -ne 'Off' -or $durationButton.Current.Name -ne '10 min' -or
+        $fishingHotkey.Current.BoundingRectangle.Bottom -gt $baitHotkey.Current.BoundingRectangle.Top -or
+        $checkboxBounds.Left -gt $viewport.Left+12*$scale -or
+        $macroButton.Current.Name -ne 'Makro' -or $macroButton.Current.IsOffscreen -or $timerButton.Current.IsEnabled) {
+        throw 'Bait defaults, settings row, or macro button are incorrect.'
+    }
+    $macroBounds = $macroButton.Current.BoundingRectangle
+    $timerBounds = $timerButton.Current.BoundingRectangle
+    $durationBounds = $durationButton.Current.BoundingRectangle
+    $macroGap = $macroBounds.Left - $labelBounds.Right
+    $durationGap = $baitHotkey.Current.BoundingRectangle.Left - $durationBounds.Right
+    $timerGap = $timerBounds.Left - $macroBounds.Right
+    if ($macroGap -lt 0 -or $macroGap -gt 6*$scale -or $timerGap -lt 0 -or $timerGap -gt 6*$scale -or
+        $timerBounds.Right -gt $durationBounds.Left -or
+        $durationGap -lt 0 -or $durationGap -gt 20*$scale) {
+        throw 'Makro and the timer button should sit next to the bait label, with duration next to the hotkey.'
+    }
+    foreach ($settingsButton in @($macroButton, (Element 'CaptureFishingHotkey'), (Element 'CaptureBaitHotkey'))) {
+        $bounds = $settingsButton.Current.BoundingRectangle
+        if ([Math]::Abs($durationBounds.Width-$bounds.Width) -gt 2 -or
+            [Math]::Abs($durationBounds.Height-$bounds.Height) -gt 2) {
+            throw 'The duration button should match the Makro and Setzen buttons in size.'
+        }
+    }
+    function Assert-BaitDisplay([string]$expected) {
+        if ($baitProgress.Current.IsOffscreen -or
+            $progress.Current.BoundingRectangle.Bottom -gt $baitProgress.Current.BoundingRectangle.Top -or
+            $baitRange.Current.Value -ne 0 -or $baitTime.Current.Name -ne $expected) {
+            throw "Expected empty bait progress below the step progress and status $expected."
+        }
+    }
+    Assert-BaitDisplay 'Deaktiviert'
+    foreach ($expectedDuration in @('5 min', '10 min', '5 min')) {
+        $durationAction.Invoke()
+        Start-Sleep -Milliseconds 150
+        if ($durationButton.Current.Name -ne $expectedDuration) {
+            throw "Clicking the duration button should switch it to $expectedDuration."
+        }
+    }
+    $baitToggle.Toggle()
+    Start-Sleep -Milliseconds 300
+    Assert-BaitDisplay 'Inaktiv'
+    $timerAction = $timerButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    if (!$timerButton.Current.IsEnabled -or $timerButton.Current.Name -ne 'Ködertimer starten') {
+        throw 'Expected the timer button to offer Start.'
+    }
+    $timerAction.Invoke()
+    Start-Sleep -Milliseconds 300
+    if ($timerButton.Current.Name -ne 'Ködertimer stoppen' -or $baitRange.Current.Value -le 0 -or
+        $baitTime.Current.Name -notmatch '^[0-9]+:[0-5][0-9]$') {
+        throw 'Starting the timer should offer Stop and show a live countdown.'
+    }
+    $timerAction.Invoke()
+    Start-Sleep -Milliseconds 300
+    Assert-BaitDisplay 'Inaktiv'
+    if ($timerButton.Current.Name -ne 'Ködertimer starten') { throw 'Stopping the timer should offer Start.' }
+    $baitToggle.Toggle()
+    Start-Sleep -Milliseconds 300
+    Assert-BaitDisplay 'Deaktiviert'
+    Write-Output 'PASS bait settings row, timer start and stop, duration button, and persistent progress visibility'
     Capture 'compact-default.png'
     Write-Output 'PASS shared Gering/Hoch endpoints below both sliders; footer has version only; all compact controls visible'
     # Even an external programmatic size change must return to the selected fixed layout.
@@ -233,6 +323,7 @@ try {
     $window.Close()
     if (!$app.WaitForExit(10000) -or $app.ExitCode -ne 0) { throw 'Fish did not close cleanly.' }
     $saved = Get-Content -LiteralPath (Join-Path $settings 'settings.json') -Raw | ConvertFrom-Json
+    if ($saved.BaitFiveMinutes -ne $true) { throw 'Bait duration was not saved.' }
     foreach ($removed in @('WindowWidth','WindowHeight','WindowMaximized','WindowDpi')) {
         if ($saved.PSObject.Properties.Name -contains $removed) { throw "Fixed window setting was persisted: $removed" }
     }
@@ -243,6 +334,7 @@ try {
     $rect = Bounds
     $expander = (Element 'PreviewSection').GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
     if ($expander.Current.ExpandCollapseState -ne 'Collapsed' -or ($rect.Bottom-$rect.Top) -ne ($compact.Bottom-$compact.Top)) { throw 'Monitoring did not restart collapsed.' }
+    if ((Element 'BaitFiveMinutes').Current.Name -ne '5 min') { throw 'Bait duration was not restored.' }
     $root.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
     if (!$app.WaitForExit(10000) -or $app.ExitCode -ne 0) { throw 'Fish restart did not close cleanly.' }
     Write-Output 'PASS restart is compact and collapsed even after closing with monitoring open'

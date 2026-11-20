@@ -10,44 +10,30 @@ namespace Fish.Views;
 
 internal sealed class HotkeyEditor : StackPanel
 {
-    private readonly TextBox _text;
+    private readonly TextBlock _text;
     private readonly Button _capture;
     private readonly TextBlock _hint;
     private readonly Action<string> _changed;
-    private string _value;
     private bool _recording;
-    public HotkeyEditor(string value, Action<string> changed)
+    public HotkeyEditor(string value, Action<string> changed, string label = "Angeln", string automationId = "FishingHotkey")
     {
-        _value = value; _changed = changed;
+        _changed = changed;
         Spacing = 3;
         var row = new Grid { ColumnSpacing = 5 };
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        _text = new TextBox { Text = value, MinHeight = 28, FontSize = 12, Padding = new(8, 3, 8, 3),
-            CornerRadius = new(6), TextAlignment = TextAlignment.Center, Foreground = Appearance.Ink, PlaceholderText = "Strg+F8" };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_text, "Angeln-Hotkey");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_text, "FishingHotkey");
-        _capture = new Button { Content = "Setzen", MinWidth = 0, MinHeight = 28, FontSize = 12,
-            Padding = new(9, 3, 9, 3), CornerRadius = new(6), Foreground = Appearance.Detection };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_capture, "Angeln-Tastenkombination setzen");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_capture, "CaptureFishingHotkey");
-        _hint = new TextBlock { Text = "Taste oder Kombination mit Strg, Alt und Umschalt.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
-        row.Children.Add(_text); Grid.SetColumn(_capture, 1); row.Children.Add(_capture); Children.Add(row); Children.Add(_hint);
-        _text.TextChanged += (_, _) =>
-        {
-            if (FishingHotkey.TryParse(_text.Text, out var hotkey))
-            {
-                _hint.Text = $"{hotkey.DisplayName} · mit Eingabe oder Fokuswechsel übernehmen.";
-                _hint.Visibility = Visibility.Collapsed;
-            }
-            else { _hint.Text = "Ungültige Taste. Bisherige Belegung bleibt."; _hint.Visibility = Visibility.Visible; }
-        };
-        _text.LostFocus += (_, _) => Commit();
-        _text.KeyDown += (_, e) =>
-        {
-            if (e.Key == VirtualKey.Enter) { Commit(); e.Handled = true; }
-            else if (e.Key == VirtualKey.Escape) { _text.Text = _value; e.Handled = true; }
-        };
+        _text = new TextBlock { Text = value, FontSize = 12, TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Foreground = Appearance.Ink };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_text, automationId);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(_text, $"{label}-Hotkey");
+        var display = new Border { Child = _text, MinHeight = 28, Padding = new(8, 3, 8, 3),
+            CornerRadius = new(6), BorderThickness = new(1), BorderBrush = Appearance.Track,
+            Background = Appearance.White, IsHitTestVisible = false };
+        _capture = new Button { Content = "Setzen", Style = (Style)Application.Current.Resources["FishSettingsButton"] };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_capture, $"{label}-Tastenkombination setzen");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_capture, $"Capture{automationId}");
+        _hint = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        row.Children.Add(display); Grid.SetColumn(_capture, 1); row.Children.Add(_capture); Children.Add(row); Children.Add(_hint);
         _capture.Click += (_, _) =>
         {
             _recording = true; _capture.Content = "Taste drücken …";
@@ -67,21 +53,17 @@ internal sealed class HotkeyEditor : StackPanel
         var modifiers = (Down(VirtualKey.Control) ? HotkeyModifiers.Control : 0) |
             (Down(VirtualKey.Menu) ? HotkeyModifiers.Alt : 0) | (Down(VirtualKey.Shift) ? HotkeyModifiers.Shift : 0);
         if (!FishingHotkey.TryCreate((int)e.Key, modifiers, out var hotkey)) return;
-        _text.Text = hotkey.ToString(); Commit(); StopRecording();
-    }
-    private void Commit()
-    {
-        if (!FishingHotkey.TryParse(_text.Text, out var hotkey)) return;
         string value = hotkey.ToString();
-        if (value != _value) { _value = value; _changed(value); }
-        _hint.Text = $"Angeln: {hotkey.DisplayName} · gilt ab dem nächsten Wurf.";
+        if (value != _text.Text)
+        {
+            _text.Text = value;
+            _changed(value);
+        }
+        StopRecording();
     }
     private void StopRecording()
     {
         _recording = false; _capture.Content = "Setzen";
-        bool valid = FishingHotkey.TryParse(_text.Text, out var hotkey);
-        _hint.Visibility = valid ? Visibility.Collapsed : Visibility.Visible;
-        _hint.Text = valid ?
-            $"Angeln: {hotkey.DisplayName} · gilt ab dem nächsten Wurf." : "Ungültige Taste. Bisherige Belegung bleibt.";
+        _hint.Visibility = Visibility.Collapsed;
     }
 }

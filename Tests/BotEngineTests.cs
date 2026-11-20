@@ -38,9 +38,81 @@ static class BotEngineTests
 
         await Exercise("Nicht gesendeter Wurf", s =>
         {
-            s.Desktop.CastFailures = 1; s.Desktop.OnKey = _ => s.Cancel();
+            s.Desktop.HotkeyFailures = 1; s.Desktop.OnKey = _ => s.Cancel();
         }, s => check(s.Desktop.Keys.Count == 1 && s.Updates.Count(u => u.State == BotState.Casting) == 1,
             "Ein übersprungener Eingabeversuch zählt nicht als Wurf und wird erneut versucht"));
+
+        await Exercise("Köder vor dem Auswurf", s =>
+        {
+            s.Options.BaitEnabled = true;
+            s.Options.BaitHotkey = "Ctrl+F8";
+            s.Desktop.HotkeyFailures = 1;
+            s.OnUpdate = update =>
+            {
+                if (update.Activity.StartsWith("Ködertaste konnte"))
+                    check(s.Engine.BaitCountdown.GetStatus() == default, "Fehlgeschlagene Eingabe startet keinen Ködertakt");
+            };
+            s.Desktop.OnKey = key => { if (key == '1') s.Cancel(); };
+        }, s =>
+        {
+            check(s.Desktop.Keys.Select(k => (k.Key, k.Modifiers)).SequenceEqual(
+                [(0x77, HotkeyModifiers.Control), ('1', HotkeyModifiers.None)]) &&
+                s.Updates.Any(u => u.Activity.StartsWith("Ködertaste konnte")),
+                "Konfigurierter Köder-Hotkey wird nach einem Fehlversuch vor der Angeltaste gesendet");
+            var application = s.Updates.Single(u => u.State == BotState.ApplyingBait).Progress!;
+            check(application.State == BotState.ApplyingBait && application.MaximumSeconds == 5 &&
+                application.StartedAt == s.Desktop.Keys[0].At && s.Desktop.Keys[1].At == application.Deadline &&
+                s.Desktop.Captures.Count == 0,
+                "Die Schrittanzeige deckt fünf Sekunden Anbringen ab, bevor der Auswurf beginnt");
+            check(s.Engine.BaitCountdown.GetStatus() == (null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10)),
+                "Die volle Wirkzeit von standardmäßig zehn Minuten beginnt am Ende des Anbringens");
+        });
+
+        await Exercise("Köder läuft während eines Wurfs ab", s =>
+        {
+            s.Options.BaitEnabled = true;
+            s.OnUpdate = update =>
+            {
+                if (update.State == BotState.Fishing) s.Clock.Advance(TimeSpan.FromMinutes(10));
+            };
+            s.Desktop.OnKey = key => { if (key == '2' && s.Desktop.Keys.Count == 3) s.Cancel(); };
+        }, s => check(s.Desktop.Keys.Select(k => k.Key).SequenceEqual(['2', '1', '2']) &&
+            s.Updates.Any(u => u.State == BotState.Fishing) && s.CastTimeouts == 1,
+            "Nach Ablauf wird der Köder erst beim nächsten Wurf erneut angebracht"));
+
+        await Exercise("Ködertimer manuell starten und stoppen", s =>
+        {
+            s.Options.BaitEnabled = true;
+            s.Options.BaitFiveMinutes = true;
+            var timer = s.Engine.BaitCountdown;
+            timer.ToggleManual(s.Options.BaitDuration);
+            check(timer.GetStatus() == (null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5)),
+                "Manueller Start beginnt sofort mit der gewählten Wirkzeit");
+            s.OnUpdate = update =>
+            {
+                if (update.State != BotState.Casting) return;
+                timer.ToggleManual(s.Options.BaitDuration);
+                check(timer.GetStatus() == default, "Manueller Stopp leert den Timer");
+            };
+            s.Desktop.OnKey = key => { if (key == '2') s.Cancel(); };
+        }, s => check(s.Desktop.Keys.Select(k => k.Key).SequenceEqual(['1', '2']) && s.Desktop.Loots.Count == 1 &&
+            s.Engine.BaitCountdown.GetStatus().Application is { MaximumSeconds: 5 },
+            "Stoppen unterbricht den laufenden Wurf nicht und der nächste Wurf startet den Köder erneut"));
+
+        await Exercise("Ködertimer manuell während der automatischen Eingabe starten", s =>
+        {
+            s.Options.BaitEnabled = true;
+            s.Desktop.OnKey = key =>
+            {
+                if (key == '2') s.Engine.BaitCountdown.ToggleManual(TimeSpan.FromMinutes(5));
+                else s.Cancel();
+            };
+        }, s => check(s.Desktop.Keys.Select(k => k.Key).SequenceEqual(['2', '1']) &&
+            s.Desktop.Keys[1].At == s.Desktop.Keys[0].At.AddSeconds(5) &&
+            s.Engine.BaitCountdown.GetStatus() == (null, TimeSpan.FromSeconds(295), TimeSpan.FromMinutes(5)),
+            "Ein gleichzeitig manuell gestarteter Timer bleibt erhalten und der Auswurf wartet das Anbringen ab"));
+
+        if (filter == null || filter("Köder über Sitzungsgrenzen")) await VerifyBaitAcrossSessions(check);
 
         await Exercise("Griffbearbeitung vor Start", s =>
         {
@@ -419,6 +491,53 @@ static class BotEngineTests
             "Auch nach fünf Minuten ohne WoW keine automatischen Folgeaktionen"));
     }
 
+    private static async Task VerifyBaitAcrossSessions(Action<bool, string> check)
+    {
+        var clock = new SimulatedTime();
+        var desktop = new SimulatedDesktop(clock);
+        var countdown = new BaitCountdown(clock);
+        var options = new BotOptions { BaitEnabled = true, BaitFiveMinutes = true };
+        async Task RunUntilInput(BaitCountdown timer)
+        {
+            using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            desktop.OnKey = _ => stop.Cancel();
+            var engine = new BotEngine(desktop, clock, timer);
+            try { await engine.RunAsync(options, stop.Token); }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+        }
+
+        await RunUntilInput(countdown);
+        var application = countdown.GetStatus().Application;
+        check(application is { MaximumSeconds: 5 } && countdown.GetStatus().Remaining == TimeSpan.Zero,
+            "Stop unmittelbar nach dem Ködertastendruck erhält das laufende Anbringen");
+        clock.Advance(TimeSpan.FromSeconds(2));
+        options.BaitEnabled = false;
+        await RunUntilInput(countdown);
+        check(desktop.Keys[1].At == application?.Deadline && countdown.GetStatus().Remaining == TimeSpan.FromMinutes(5),
+            "Auch nach Stop und Neustart wartet der Auswurf das Anbringen ab");
+        clock.Advance(TimeSpan.FromMinutes(2));
+        check(countdown.GetStatus().Remaining == TimeSpan.FromMinutes(3),
+            "Köderzeit läuft zwischen Sitzungen und bei deaktivierter Option weiter");
+        options.BaitEnabled = true;
+        options.BaitFiveMinutes = false;
+        await RunUntilInput(countdown);
+        check(countdown.GetStatus().Duration == TimeSpan.FromMinutes(5),
+            "Die neue Einstellung gilt für den nächsten Köder");
+        clock.Advance(TimeSpan.FromMinutes(3));
+        check(countdown.GetStatus() == default, "Köderzeit endet nach fünf Minuten auch bei gestoppter Sitzung");
+        await RunUntilInput(countdown);
+        clock.Advance(TimeSpan.FromSeconds(5));
+        check(countdown.GetStatus() == (null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10)),
+            "Im Zehn-Minuten-Modus startet nach dem Anbringen die volle Wirkzeit");
+        var restarted = new BaitCountdown(clock);
+        check(restarted.GetStatus() == default, "Eine neue App-Instanz startet mit leerem Ködertimer");
+        await RunUntilInput(restarted);
+        clock.Advance(TimeSpan.FromMinutes(10));
+        check(countdown.GetStatus() == default, "Der lange Köder läuft genau nach zehn Minuten ab");
+        check(desktop.Keys.Select(k => k.Key).SequenceEqual(['2', '1', '1', '2', '2']),
+            "Neustart der Sitzung verwendet den aktiven Köder weiter und trägt ihn erst nach Ablauf erneut auf");
+    }
+
     private sealed class Scenario : IDisposable
     {
         public readonly SimulatedTime Clock = new();
@@ -462,7 +581,7 @@ static class BotEngineTests
         private int _bobberCaptures;
         public Action<PixelRect>? OnCapture;
         public Action? OnLoot;
-        public int CastFailures, LootFailures, LootAttempts;
+        public int HotkeyFailures, LootFailures, LootAttempts;
         public nint FindGame() { OnFind?.Invoke(++_findCalls); return Game; }
         public bool IsAvailable(nint game) => Available && game == Game && game != 0;
         public PixelRect? GetGameBounds(nint game) => IsAvailable(game) ? Bounds : null;
@@ -493,10 +612,10 @@ static class BotEngineTests
             }
             return frame;
         }
-        public Task<bool> CastAsync(nint game, FishingHotkey hotkey, PixelRect expectedBounds, CancellationToken cancellation)
+        public Task<bool> SendHotkeyAsync(nint game, FishingHotkey hotkey, PixelRect expectedBounds, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
-            if (CastFailures > 0) { CastFailures--; return Task.FromResult(false); }
+            if (HotkeyFailures > 0) { HotkeyFailures--; return Task.FromResult(false); }
             Keys.Add((clock.GetUtcNow(), game, hotkey.Key, hotkey.Modifiers)); OnKey?.Invoke(hotkey.Key);
             return Task.FromResult(true);
         }
@@ -514,6 +633,8 @@ static class BotEngineTests
         private readonly object _gate = new();
         private DateTimeOffset _now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         public override DateTimeOffset GetUtcNow() { lock (_gate) return _now; }
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => GetUtcNow().Ticks;
         public void Advance(TimeSpan span) { lock (_gate) _now += span; }
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
             => new AdvancingTimer(this, callback, state, dueTime);

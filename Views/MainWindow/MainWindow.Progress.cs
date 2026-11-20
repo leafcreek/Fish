@@ -37,7 +37,7 @@ public sealed partial class MainWindow
     {
         if (StepTimeProgress == null || _closeAllowed) return;
         var now = DateTimeOffset.UtcNow;
-        if (now >= _stepFlashUntil) _stepFlash = null;
+        if (now >= _stepFlashUntil || _currentStep?.State == BotState.ApplyingBait) _stepFlash = null;
         var progress = _stepFlash?.Progress ?? _currentStep;
         bool idle = progress == null;
         if (idle && _progressIdle) return;
@@ -46,7 +46,7 @@ public sealed partial class MainWindow
         double elapsed = progress?.ElapsedSeconds(_stepFlash?.CompletedAt ?? now) ?? 0;
         string label = progress?.State switch
         {
-            BotState.Casting => "Aufsetzen", BotState.SearchingBobber => "Suche",
+            BotState.ApplyingBait => "Köder anbringen", BotState.Casting => "Aufsetzen", BotState.SearchingBobber => "Suche",
             BotState.Fishing => "Warten", BotState.Looting => "Nächster Wurf", _ => "Startklar"
         };
         if (_stepFlash is { } flash)
@@ -67,5 +67,21 @@ public sealed partial class MainWindow
         StepProgressPanel.Background = _stepFlash is { } flashResult
             ? flashResult.Success ? Appearance.SuccessFlash : Appearance.TimeoutFlash : Appearance.Transparent;
         AutomationProperties.SetHelpText(StepTimeProgress, $"{label} · {StepTimeText.Text}");
+    }
+
+    private void RefreshBaitProgress()
+    {
+        if (_closeAllowed) return;
+        var (_, remaining, duration) = _baitCountdown.GetStatus();
+        _settingsEditor?.UpdateBaitTimer(duration > TimeSpan.Zero, _options.BaitEnabled);
+        if (!_options.BaitEnabled)
+        {
+            BaitTimeText.Text = "Deaktiviert";
+            BaitTimeProgress.Value = 0;
+            return;
+        }
+        var displayTime = TimeSpan.FromSeconds(Math.Ceiling(remaining.TotalSeconds));
+        BaitTimeText.Text = remaining > TimeSpan.Zero ? displayTime.ToString(@"m\:ss") : "Inaktiv";
+        BaitTimeProgress.Value = remaining > TimeSpan.Zero ? remaining.TotalSeconds / duration.TotalSeconds : 0;
     }
 }

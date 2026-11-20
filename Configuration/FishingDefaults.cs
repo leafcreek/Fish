@@ -1,6 +1,6 @@
 namespace Fish.Configuration;
 
-/// <summary>Fixed fishing behavior; only detection thresholds and the draggable bobber region are configurable.</summary>
+/// <summary>Fixed timings and detection defaults for the fishing cycle.</summary>
 public static class FishingDefaults
 {
     public const int CastTimeoutSeconds = 25;

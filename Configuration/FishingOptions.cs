@@ -17,7 +17,8 @@ public sealed record MotionOptions(int PixelTolerance, int MinimumPercent)
 
 /// <summary>Immutable runtime configuration. Window and application preferences stay on the UI thread.</summary>
 public sealed record FishingOptions(FishingHotkey Hotkey, SearchRegion BobberRegion,
-    int BobberMatchMinimum, int BobberColorTolerance, MotionOptions Motion)
+    int BobberMatchMinimum, int BobberColorTolerance, MotionOptions Motion, bool BaitEnabled, FishingHotkey BaitHotkey,
+    TimeSpan BaitDuration)
 {
     public int ScanIntervalMilliseconds => FishingDefaults.ScanIntervalMilliseconds;
     public int CastTimeoutSeconds => FishingDefaults.CastTimeoutSeconds;
@@ -30,7 +31,9 @@ public sealed record FishingOptions(FishingHotkey Hotkey, SearchRegion BobberReg
         var bobber = DetectionSensitivity.Bobber(o);
         var splash = DetectionSensitivity.Splash(o);
         FishingHotkey.TryParse(o.FishingHotkey, out var hotkey);
+        FishingHotkey.TryParse(o.BaitHotkey, out var baitHotkey);
         return new(hotkey, new(o.BobberAreaWidth, o.BobberAreaHeight, o.BobberAreaXOffset, o.BobberAreaYOffset),
-            bobber.MinimumRating, bobber.ColorTolerance, new(splash.PixelTolerance, splash.MinimumChangePercent));
+            bobber.MinimumRating, bobber.ColorTolerance, new(splash.PixelTolerance, splash.MinimumChangePercent),
+            o.BaitEnabled, baitHotkey, o.BaitDuration);
     }
 }

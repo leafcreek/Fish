@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _cancellation;
     private Task? _session;
     private BotEngine? _activeEngine;
+    private readonly BaitCountdown _baitCountdown = new();
     private bool _running;
     private readonly DetectionOverlays _overlays = new();
     private bool _closing, _closeAllowed, _saveAllowed = true;
@@ -50,6 +51,7 @@ public sealed partial class MainWindow : Window
             UpdateOverlays();
             RefreshPreviews();
             RefreshStepProgress();
+            RefreshBaitProgress();
         };
         _overlayTimer.Start();
         InitializePersistence();
@@ -107,7 +109,7 @@ public sealed partial class MainWindow : Window
         _closing = true;
         _updateCancellation?.Cancel();
         _updateDialog?.Hide();
-        _updateStatusFlyout?.Hide();
+        _statusFlyout?.Hide();
         _saveTimer?.Stop();
         SessionButton.IsEnabled = false;
         _cancellation?.Cancel();

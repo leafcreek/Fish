@@ -48,7 +48,7 @@ public sealed partial class MainWindow
     private async Task RunSessionAsync(int id, CancellationTokenSource cancellation)
     {
         using var desktop = new BotDesktop();
-        var engine = new BotEngine(desktop);
+        var engine = new BotEngine(desktop, baitCountdown: _baitCountdown);
         engine.SetAreaEditing(_overlays.IsEditing);
         engine.SetLivePreviewEnabled(CanShowLivePreview);
         _activeEngine = engine;

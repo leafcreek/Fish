@@ -22,11 +22,11 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
     private int _completionId;
     private DateTimeOffset Now => time.GetUtcNow();
 
-    private void Publish(BotState state, string activity)
+    private void Publish(BotState state, string activity, StepProgress? progress = null)
     {
         var update = new BotUpdate(state, activity, _bounds != null ? _bobberArea : null,
             _phase == BotState.Fishing ? _splashArea : null, _game, _phase == BotState.Fishing ? _bobber : null,
-            CurrentProgress(), _completedStep);
+            progress ?? CurrentProgress(), _completedStep);
         if (update == _published) return;
         _published = update; owner.Publish(update);
     }
@@ -111,8 +111,24 @@ internal sealed class FishingSession(BotEngine owner, IBotDesktop desktop, TimeP
         switch (_phase)
         {
             case BotState.Idle:
+                var bait = owner.BaitCountdown.GetApplicationStatus();
+                if (bait.Application is { } application)
+                {
+                    Publish(BotState.ApplyingBait, "Köder wird angebracht", application);
+                    return;
+                }
+                if (_options.BaitEnabled && bait.ShouldApply)
+                {
+                    if (await desktop.SendHotkeyAsync(_game, _options.BaitHotkey, _bounds!.Value, cancellation).ConfigureAwait(false))
+                    {
+                        var progress = owner.BaitCountdown.StartApplication(_options.BaitDuration, bait.ManualRevision);
+                        Publish(BotState.ApplyingBait, "Köder wird angebracht", progress);
+                    }
+                    else Publish(_phase, "Ködertaste konnte nicht gesendet werden · erneut versuchen");
+                    return;
+                }
                 var castAt = Now;
-                if (!await desktop.CastAsync(_game, _options.Hotkey, _bounds!.Value, cancellation).ConfigureAwait(false))
+                if (!await desktop.SendHotkeyAsync(_game, _options.Hotkey, _bounds!.Value, cancellation).ConfigureAwait(false))
                 { Publish(_phase, "Wurf konnte nicht gesendet werden · erneut versuchen"); return; }
                 _castAt = castAt; _searchAt = null; ResetObservation(); _phase = BotState.Casting;
                 _bobberReadyAt = castAt.AddMilliseconds(FishingDefaults.CastSettlingMilliseconds);

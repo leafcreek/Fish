@@ -7,12 +7,16 @@ namespace Fish.Views;
 
 internal sealed class SettingsEditor
 {
-    public SettingsEditor(StackPanel panel, BotOptions options, Action changed)
+    private readonly Button _baitTimer;
+
+    public SettingsEditor(StackPanel panel, BotOptions options, Action changed, Action<Button> copyBaitMacro, Action toggleBaitTimer)
     {
         panel.Children.Clear();
-        var hotkey = Row(panel, "Angeltaste");
+        var hotkey = Row(panel, RowLabel("Angeltaste"));
         var editor = new HotkeyEditor(options.FishingHotkey, value => { options.FishingHotkey = value; changed(); }) { Width = 145 };
         Grid.SetColumn(editor, 1); hotkey.Children.Add(editor);
+
+        _baitTimer = AddBaitRow(panel, options, changed, copyBaitMacro, toggleBaitTimer);
 
         var tolerance = new StackPanel { Spacing = 0, Margin = new(0, 4, 0, 0) };
         tolerance.Children.Add(new TextBlock { Text = "Erkennungstoleranz", FontSize = 13, Foreground = Appearance.Ink,
@@ -30,15 +34,87 @@ internal sealed class SettingsEditor
         tolerance.Children.Add(direction);
     }
 
-    private static Grid Row(StackPanel panel, string label)
+    public void UpdateBaitTimer(bool running, bool enabled)
+    {
+        _baitTimer.IsEnabled = enabled;
+        string symbol = running ? "■" : "▶";
+        if (_baitTimer.Content as string == symbol) return;
+        _baitTimer.Content = symbol;
+        AutomationProperties.SetName(_baitTimer, running ? "Ködertimer stoppen" : "Ködertimer starten");
+    }
+
+    private static Button AddBaitRow(StackPanel panel, BotOptions options, Action changed, Action<Button> copyMacro,
+        Action toggleBaitTimer)
+    {
+        var rightControls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var enabled = new CheckBox { IsChecked = options.BaitEnabled, MinWidth = 0, Width = 24,
+            MinHeight = 32, Padding = new(0), VerticalAlignment = VerticalAlignment.Center };
+        foreach (string state in new[] { "", "PointerOver", "Pressed" })
+        {
+            enabled.Resources["CheckBoxCheckBackgroundFillChecked" + state] = Appearance.Detection;
+            enabled.Resources["CheckBoxCheckBackgroundStrokeChecked" + state] = Appearance.Detection;
+            enabled.Resources["CheckBoxCheckGlyphForegroundChecked" + state] = Appearance.White;
+        }
+        AutomationProperties.SetName(enabled, "Köder aktivieren");
+        AutomationProperties.SetAutomationId(enabled, "BaitEnabled");
+        var leftControls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center };
+        var baitLabel = RowLabel("Köder");
+        AutomationProperties.SetAutomationId(baitLabel, "BaitSettingLabel");
+        leftControls.Children.Add(enabled);
+        leftControls.Children.Add(baitLabel);
+        var row = Row(panel, leftControls);
+        void UpdateBaitEnabled(object sender, RoutedEventArgs args)
+        {
+            options.BaitEnabled = enabled.IsChecked == true;
+            changed();
+        }
+        enabled.Checked += UpdateBaitEnabled;
+        enabled.Unchecked += UpdateBaitEnabled;
+        var buttonStyle = (Style)Application.Current.Resources["FishSettingsButton"];
+        var macro = new Button { Content = "Makro", Style = buttonStyle };
+        AutomationProperties.SetAutomationId(macro, "CopyBaitMacro");
+        AutomationProperties.SetHelpText(macro, "Kopiert das Ködermakro in die Zwischenablage.");
+        macro.Click += (_, _) => copyMacro(macro);
+        leftControls.Children.Add(macro);
+        var baitTimer = new Button { Style = buttonStyle };
+        AutomationProperties.SetAutomationId(baitTimer, "BaitTimerToggle");
+        baitTimer.Click += (_, _) => toggleBaitTimer();
+        leftControls.Children.Add(baitTimer);
+
+        var duration = new Button { Content = BaitDurationLabel(options.BaitFiveMinutes), Style = buttonStyle };
+        AutomationProperties.SetAutomationId(duration, "BaitFiveMinutes");
+        AutomationProperties.SetHelpText(duration, "Köderwirkzeit zwischen fünf und zehn Minuten umschalten.");
+        duration.Click += (_, _) =>
+        {
+            options.BaitFiveMinutes = !options.BaitFiveMinutes;
+            duration.Content = BaitDurationLabel(options.BaitFiveMinutes);
+            changed();
+        };
+        rightControls.Children.Add(duration);
+        rightControls.Children.Add(new HotkeyEditor(options.BaitHotkey,
+            value => { options.BaitHotkey = value; changed(); }, "Köder", "BaitHotkey") { Width = 145 });
+        Grid.SetColumn(rightControls, 1);
+        row.Children.Add(rightControls);
+        return baitTimer;
+    }
+
+    private static string BaitDurationLabel(bool fiveMinutes) => fiveMinutes ? "5 min" : "10 min";
+
+    private static Grid Row(StackPanel panel, FrameworkElement label)
     {
         var row = new Grid { ColumnSpacing = 8, MinHeight = 32 };
         row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        row.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = Appearance.Muted, VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(label);
         panel.Children.Add(row);
         return row;
     }
+
+    private static TextBlock RowLabel(string text) => new()
+    {
+        Text = text, FontSize = 12, Foreground = Appearance.Muted, VerticalAlignment = VerticalAlignment.Center
+    };
 
     private static void Sensitivity(StackPanel panel, string label, string id, int value,
         Action<int> write, Action changed)
