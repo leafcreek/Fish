@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace Fish.Services.Updates;
 
-internal sealed record UpdateRelease(string Version, Uri Page, Uri Download, long Size, string? Sha256, Uri? Checksums);
+internal sealed record UpdateRelease(string Version, Uri Page, Uri Download, long Size, string? Sha256, Uri? Checksums, string? Notes);
 internal sealed record DownloadedUpdate(string Session, string Package, string Sha256);
 
 internal sealed class GitHubUpdates(HttpClient client, string? downloadRoot = null)
@@ -40,7 +40,7 @@ internal sealed class GitHubUpdates(HttpClient client, string? downloadRoot = nu
         if (hash == null && checksums == null) throw new IOException("Im Release fehlt die Prüfsumme.");
         return new(release.Tag, GitHubUri(release.Page, "/releases/tag/"),
             GitHubUri(package.Url, "/releases/download/"), package.Size, hash,
-            checksums == null ? null : GitHubUri(checksums.Url, "/releases/download/"));
+            checksums == null ? null : GitHubUri(checksums.Url, "/releases/download/"), release.Body);
     }
 
     public async Task<DownloadedUpdate> DownloadAsync(UpdateRelease release, IProgress<double>? progress, CancellationToken cancellation)
@@ -130,6 +130,7 @@ internal sealed class GitHubUpdates(HttpClient client, string? downloadRoot = nu
     {
         [JsonPropertyName("tag_name")] public string Tag { get; init; } = "";
         [JsonPropertyName("html_url")] public string Page { get; init; } = "";
+        [JsonPropertyName("body")] public string? Body { get; init; }
         [JsonPropertyName("draft")] public bool Draft { get; init; }
         [JsonPropertyName("prerelease")] public bool Prerelease { get; init; }
         [JsonPropertyName("assets")] public Asset[] Assets { get; init; } = [];

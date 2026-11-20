@@ -37,13 +37,24 @@ public sealed partial class MainWindow
                 ShowCurrentVersion(label);
                 return;
             }
-            var content = new StackPanel { Spacing = 12 };
-            content.Children.Add(new TextBlock { Text = "Beim Aktualisieren wird das Angeln beendet und Fish neu gestartet.", TextWrapping = TextWrapping.Wrap });
-            content.Children.Add(new HyperlinkButton { Content = "Änderungen", NavigateUri = release.Page, Padding = new Thickness(0) });
+            var notes = new TextBox
+            {
+                IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 180,
+                Text = string.IsNullOrWhiteSpace(release.Notes) ? "Für diese Version sind keine Änderungen beschrieben." : release.Notes
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(notes, ScrollBarVisibility.Auto);
+            AutomationProperties.SetName(notes, "Release-Notizen");
+            AutomationProperties.SetAutomationId(notes, "UpdateReleaseNotes");
+            var changes = new Expander
+            {
+                Header = "Änderungen", Content = notes, HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            AutomationProperties.SetAutomationId(changes, "UpdateChanges");
             var offer = new ContentDialog
             {
                 XamlRoot = Root.XamlRoot, RequestedTheme = ElementTheme.Light,
-                Title = "Fish " + release.Version + " ist verfügbar", Content = content,
+                Title = "Fish " + release.Version + " ist verfügbar", Content = changes,
                 PrimaryButtonText = "Aktualisieren", CloseButtonText = "Später", DefaultButton = ContentDialogButton.Primary
             };
             _updateDialog = offer;
@@ -55,13 +66,7 @@ public sealed partial class MainWindow
             _updateHandoff = await UpdateInstaller.StartAsync(download, _store.Folder, cancellation.Token);
             if (_closing) { _updateHandoff.Dispose(); _updateHandoff = null; return; }
             _installingUpdate = true;
-            SessionButton.IsEnabled = false;
-            _cancellation?.Cancel();
-            if (_session is { IsCompleted: false }) await _session;
-            if (_closing) return;
-            if (!_saveAllowed) throw new IOException("Die Einstellungen können gerade nicht gespeichert werden.");
-            // OnClosing saves settings and approves the handoff only when closing succeeds.
-            Close();
+            if (await PrepareCloseAsync()) Close();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception error)

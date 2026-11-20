@@ -103,20 +103,26 @@ public sealed partial class MainWindow : Window
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (_closeAllowed) return;
-        if (_closing) { args.Cancel = true; return; }
-        bool awaitSession = _session is { IsCompleted: false };
-        args.Cancel = awaitSession;
+        args.Cancel = true;
+        if (await PrepareCloseAsync()) DispatcherQueue.TryEnqueue(Close);
+    }
+
+    private async Task<bool> PrepareCloseAsync()
+    {
+        if (_closing) return false;
         _closing = true;
+        bool updating = _updateHandoff != null;
         _updateCancellation?.Cancel();
         _updateDialog?.Hide();
         _statusFlyout?.Hide();
         _saveTimer?.Stop();
         SessionButton.IsEnabled = false;
         _cancellation?.Cancel();
-        if (awaitSession) await _session!;
         try
         {
+            if (_session is { IsCompleted: false }) await _session;
             if (_saveAllowed) SaveSettings();
+            else if (updating) throw new IOException("Die Einstellungen können gerade nicht gespeichert werden.");
             _updateHandoff?.Approve();
             _updateHandoff?.Dispose();
             _updateHandoff = null;
@@ -125,21 +131,20 @@ public sealed partial class MainWindow : Window
         {
             _updateHandoff?.Dispose();
             _updateHandoff = null;
-            args.Cancel = true;
             _closing = false;
             RestoreWindow();
             SetRunning(false);
+            if (updating) throw;
             ShowError("Einstellungen konnten nicht gespeichert werden. Fenster erneut schließen, um ohne Speichern zu beenden. " + ex.Message);
             _saveAllowed = false;
-            return;
+            return false;
         }
         _overlays.Dispose();
         _overlayTimer.Stop();
         _windowEnvironment?.Dispose();
 
         _closeAllowed = true;
-        // An idle window can finish its original close; only an active session needs a second request.
-        if (awaitSession) DispatcherQueue.TryEnqueue(Close);
+        return true;
     }
     private void ShowError(string message)
     {

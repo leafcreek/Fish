@@ -76,7 +76,7 @@ dotnet publish Fish.csproj -c Release -p:PublishProfile=win-x64
 
 Die eigenständig lauffähige Einzeldatei entsteht unter `publish/Fish.exe`. Benutzereinstellungen gehören nicht in den Release-Download.
 
-Releases verwenden übereinstimmende Versionen in `Fish.csproj` und GitHub-Tag (`v1.2.0`) sowie die Assets `Fish.exe` und `SHA256SUMS.txt`. Erst nach vollständigem Upload wird das Release veröffentlicht und als neuestes reguläres Release markiert. Eine veröffentlichte Version wird nicht nachträglich mit einem anderen Build überschrieben.
+Releases verwenden übereinstimmende Versionen in `Fish.csproj` und GitHub-Tag (`v1.2.0`) sowie die Assets `Fish.exe` und `SHA256SUMS.txt`. Die Release Notes nennen die Änderungen kurz in Stichpunkten. Erst nach vollständigem Upload wird das Release veröffentlicht und als neuestes reguläres Release markiert. Eine veröffentlichte Version wird nicht nachträglich mit einem anderen Build überschrieben.
 
 Beim Update bleibt die vorherige EXE als `<Name>.exe.bak` neben dem Programm erhalten. Kann die neue Version nicht starten, wird die Sicherung automatisch wiederhergestellt. Fehlen Schreibrechte, bietet Fish den manuellen Download an. Einstellungen bleiben an ihrem bisherigen Speicherort, auch mit `--settings-directory`. Temporäre Downloads liegen unter `%LOCALAPPDATA%\Fish\Updates`; über zwei Tage alte Aufträge werden beim nächsten Start aufgeräumt. Die SHA-256-Prüfung erkennt beschädigte Downloads; sie ist keine unabhängige Herausgebersignatur.
 

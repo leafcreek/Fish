@@ -14,9 +14,11 @@ internal static class UpdateTests
             "Versionen werden numerisch verglichen; Vorabversionen und ungültige Angaben abgewiesen");
         byte[] package = Encoding.UTF8.GetBytes("Fish update fixture");
         string hash = Convert.ToHexString(SHA256.HashData(package)).ToLowerInvariant();
-        string Json(string tag = "v1.1.0", string? digest = null, string host = "github.com", bool prerelease = false) => JsonSerializer.Serialize(new
+        const string notes = "# Fish 1.1.0\r\n\r\n- Ködertimer\r\n- Neue Einstellungen";
+        string Json(string tag = "v1.1.0", string? digest = null, string host = "github.com", bool prerelease = false,
+            string? body = null) => JsonSerializer.Serialize(new
         {
-            tag_name = tag, html_url = $"https://github.com/leafcreek/Fish/releases/tag/{tag}", draft = false, prerelease,
+            tag_name = tag, html_url = $"https://github.com/leafcreek/Fish/releases/tag/{tag}", draft = false, prerelease, body,
             assets = new object[] {
                 new { name = "Fish.exe", browser_download_url = $"https://{host}/leafcreek/Fish/releases/download/{tag}/Fish.exe", size = package.Length, digest },
                 new { name = "SHA256SUMS.txt", browser_download_url = $"https://github.com/leafcreek/Fish/releases/download/{tag}/SHA256SUMS.txt", size = 76 }
@@ -28,10 +30,11 @@ internal static class UpdateTests
             if (request.RequestUri.AbsolutePath.EndsWith("SHA256SUMS.txt")) return new(HttpStatusCode.OK) { Content = new StringContent(hash + "  Fish.exe\n") };
             return new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes ?? package) };
         }
-        using var http = new HttpClient(new Handler(request => Respond(request, Json(digest: "sha256:" + hash))));
+        using var http = new HttpClient(new Handler(request => Respond(request, Json(digest: "sha256:" + hash, body: notes))));
         var updates = new GitHubUpdates(http, folder);
         var release = await updates.CheckAsync("v1.0.0", default);
         check(release is { Version: "v1.1.0" } && release.Sha256 == hash, "Neues GitHub-Release und SHA-256 erkannt");
+        check(release?.Notes == notes, "Versionsprüfung übernimmt mehrzeilige Release-Notizen aus der GitHub-Antwort");
         check(await updates.CheckAsync("v1.1.0", default) == null && await updates.CheckAsync("v2.0.0", default) == null,
             "Gleiche und ältere Releases lösen kein Update aus");
         using var untrusted = new HttpClient(new Handler(request => Respond(request, Json(host: "example.com"))));
@@ -42,6 +45,7 @@ internal static class UpdateTests
         using var fallback = new HttpClient(new Handler(request => Respond(request, Json())));
         var fallbackUpdates = new GitHubUpdates(fallback, folder);
         var fallbackRelease = (await fallbackUpdates.CheckAsync("v1.0.0", default))!;
+        check(fallbackRelease.Notes == null, "Release ohne Notizen bietet weiterhin ein Update an");
         var downloaded = await fallbackUpdates.DownloadAsync(fallbackRelease, null, default);
         try
         {
